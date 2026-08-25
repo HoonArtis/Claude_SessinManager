@@ -971,9 +971,13 @@ async function doUpdate() {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error);
     $v.textContent = '적용 중 — 곧 새로고침됩니다...';
-    // 서버가 재시작될 때까지 기다렸다가 새 버전 페이지로 리로드
+    // 서버가 재시작될 때까지 기다렸다가 새 버전 페이지로 리로드 (최대 ~15초, 실패 시 안내만)
+    let tries = 0;
     setTimeout(function poll() {
-      fetch('/api/version').then(() => location.reload()).catch(() => setTimeout(poll, 700));
+      fetch('/api/version').then(() => location.reload()).catch(() => {
+        if (++tries > 20) { $v.textContent = '재시작 대기 시간 초과 — 바로가기로 다시 실행해주세요.'; return; }
+        setTimeout(poll, 700);
+      });
     }, 2500);
   } catch (err) {
     $v.textContent = '업데이트 실패: ' + err.message;
