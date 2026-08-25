@@ -1,8 +1,10 @@
+<!doctype html>
+<html lang="ko">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Claude 세션 매니저</title>
 <style>
-  :root { --bg: #f6f7f9; --panel: #fff; --border: #e2e5ea; --text: #1c2128; --muted: #5c6470; --accent: #c96442; --accent-soft: #f7e8e2; --time: #1d4ed8; --time-soft: #eff3fe; --token: #b45309; --token-soft: #fdf3e3; }
+  :root { --bg: #f6f7f9; --panel: #fff; --border: #e2e5ea; --text: #1c2128; --muted: #5c6470; --accent: #c96442; --accent-deep: #a84a2e; --accent-soft: #f7e8e2; --time: #1d4ed8; --time-soft: #eff3fe; --token: #96470a; --token-soft: #fdf3e3; --danger: #c0392b; }
   * { box-sizing: border-box; }
   ::selection { background: var(--accent-soft); color: var(--text); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
@@ -22,7 +24,7 @@
   .title-edit input { flex: 1; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; font-size: 14px; background: var(--bg); color: var(--text); }
   .title-edit button { min-height: 38px; padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
   .title-edit .save { background: var(--accent); border-color: var(--accent); color: #fff; }
-  #renameBtn { flex: none; width: 34px; height: 34px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  #renameBtn { flex: none; width: 40px; height: 40px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
   #renameBtn:hover { border-color: var(--accent); color: var(--accent); }
   #search { flex: 1; min-width: 160px; max-width: 480px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg); caret-color: var(--accent); }
   #search:focus { outline: 2px solid var(--accent); outline-offset: 0; background: var(--panel); }
@@ -65,18 +67,18 @@
   .meta .tokens { color: var(--token); background: var(--token-soft); font-weight: 600; padding: 1px 7px; border-radius: 9px; }
   .row .check { display: none; position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 6px; background: var(--panel); align-items: center; justify-content: center; color: #fff; }
   body.delete-mode .row .check { display: flex; }
-  body.delete-mode .row.checked { border-color: #c0392b; box-shadow: 0 0 0 1px #c0392b; }
-  body.delete-mode .row.checked .check { background: #c0392b; border-color: #c0392b; }
+  body.delete-mode .row.checked { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
+  body.delete-mode .row.checked .check { background: var(--danger); border-color: var(--danger); }
   #empty-msg { grid-column: 1 / -1; }
   #delBar { display: none; position: sticky; bottom: 0; grid-column: 1 / -1; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; box-shadow: 0 -4px 16px rgba(28,33,40,.08); align-items: center; gap: 12px; }
   body.delete-mode #delBar { display: flex; }
   #delBar .count { flex: 1; font-size: 13px; }
   #delBar button { min-height: 40px; padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; }
-  #delConfirmBtn { background: #c0392b; color: #fff; border: 0; }
+  #delConfirmBtn { background: var(--danger); color: #fff; border: 0; }
   #delConfirmBtn:disabled { opacity: .5; cursor: default; }
   #delCancelBtn { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
   #delBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; color: var(--text); cursor: pointer; }
-  #delBtn:hover, body.delete-mode #delBtn { border-color: #c0392b; color: #c0392b; }
+  #delBtn:hover, body.delete-mode #delBtn { border-color: var(--danger); color: var(--danger); }
   #backupBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; color: var(--text); cursor: pointer; }
   #backupBtn:hover { border-color: var(--accent); color: var(--accent); }
   #detail { width: 40%; min-width: 320px; max-width: 560px; background: var(--panel); border-left: 1px solid var(--border); padding: 20px; overflow-y: auto; display: none; }
@@ -97,7 +99,7 @@
   #status { margin-top: 8px; font-size: 13px; color: var(--muted); min-height: 18px; }
   #speedupBtn { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
   #speedupBtn:hover { background: var(--accent); color: #fff; }
-  .speedup-hint { font-size: 12px; color: var(--accent); margin: 8px 0 0; }
+  .speedup-hint { font-size: 12px; color: var(--accent-deep); margin: 8px 0 0; }
   #convBtn { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
   #convBtn:hover { border-color: var(--accent); color: var(--accent); }
   #convList { margin-top: 10px; max-height: 340px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
@@ -109,7 +111,7 @@
   .mode-btn { min-height: 34px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 12px; color: var(--muted); cursor: pointer; }
   .mode-btn:hover { border-color: var(--accent); color: var(--accent); }
   .mode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .heavy-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 5px; padding: 2px 6px; margin-right: 6px; vertical-align: 1px; }
+  .heavy-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--accent-deep); background: var(--accent-soft); border-radius: 5px; padding: 2px 6px; margin-right: 6px; vertical-align: 1px; }
   .heavy-badge .icon { width: 11px; height: 11px; }
   #empty-msg { color: var(--muted); text-align: center; margin-top: 40px; }
   #kbOverlay { display: none; position: fixed; inset: 0; background: rgba(28,33,40,.4); z-index: 10; }
@@ -131,16 +133,16 @@
   .kb-key:hover { border-color: var(--accent); }
   .kb-key.listening { border-color: var(--accent); color: var(--accent); }
   .kb-key.changed { border-color: var(--accent); }
-  .kb-key.conflict { border-color: #c0392b; box-shadow: 0 0 0 1px #c0392b; }
-  .kb-key.conflict kbd { border-color: #c0392b; color: #c0392b; }
-  .kb-conflict-msg { color: #c0392b; }
+  .kb-key.conflict { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
+  .kb-key.conflict kbd { border-color: var(--danger); color: var(--danger); }
+  .kb-conflict-msg { color: var(--danger); }
   .kb-conflict-actions { display: flex; gap: 8px; margin-top: 10px; }
   .kb-conflict-actions button { flex: 1; min-height: 40px; border-radius: 8px; font-size: 13px; cursor: pointer; }
-  #kbConflictYes { background: #c0392b; color: #fff; border: 0; }
+  #kbConflictYes { background: var(--danger); color: #fff; border: 0; }
   #kbConflictNo { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
   #kbStatus { margin-top: 12px; font-size: 13px; color: var(--muted); min-height: 18px; }
   #kbUnbindBtn { margin-left: 8px; min-height: 32px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 12px; cursor: pointer; }
-  #kbUnbindBtn:hover { border-color: #c0392b; color: #c0392b; }
+  #kbUnbindBtn:hover { border-color: var(--danger); color: var(--danger); }
   #kbClose { margin-top: 12px; width: 100%; min-height: 44px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; cursor: pointer; }
   #kbClose:hover { border-color: var(--accent); color: var(--accent); }
   @media (max-width: 768px) {
@@ -189,7 +191,7 @@
     <h2 id="delTitle" style="font-size:15px; margin:0 0 8px;">정말 삭제할까요?</h2>
     <p id="delDesc" style="font-size:13px; color:var(--muted); margin:0 0 16px;"></p>
     <div style="display:flex; gap:8px;">
-      <button id="delYes" style="flex:1; min-height:44px; background:#c0392b; color:#fff; border:0; border-radius:8px; font-size:14px; cursor:pointer;">삭제</button>
+      <button id="delYes" style="flex:1; min-height:44px; background:var(--danger); color:#fff; border:0; border-radius:8px; font-size:14px; cursor:pointer;">삭제</button>
       <button id="delNo" style="flex:1; min-height:44px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer;">취소</button>
     </div>
   </div>
@@ -227,11 +229,11 @@
 </div>
 <div id="kbWarnOverlay" style="display:none; position:fixed; inset:0; background:rgba(28,33,40,.4); z-index:12; align-items:center; justify-content:center;">
   <div role="alertdialog" aria-modal="true" aria-labelledby="kbWarnTitle" style="background:var(--panel); border-radius:12px; padding:24px; width:460px; max-width:calc(100vw - 24px); box-shadow:0 12px 32px rgba(28,33,40,.18);">
-    <h2 id="kbWarnTitle" style="font-size:15px; margin:0 0 8px; color:#c0392b;">이 키는 주의가 필요합니다</h2>
+    <h2 id="kbWarnTitle" style="font-size:15px; margin:0 0 8px; color:var(--danger);">이 키는 주의가 필요합니다</h2>
     <div id="kbWarnKeys" style="margin:0 0 10px;"></div>
     <ul id="kbWarnList" style="font-size:13px; color:var(--text); margin:0 0 16px; padding-left:18px; line-height:1.6;"></ul>
     <div style="display:flex; gap:8px;">
-      <button id="kbWarnYes" style="flex:1; min-height:44px; background:#c0392b; color:#fff; border:0; border-radius:8px; font-size:14px; cursor:pointer;">그래도 수정</button>
+      <button id="kbWarnYes" style="flex:1; min-height:44px; background:var(--danger); color:#fff; border:0; border-radius:8px; font-size:14px; cursor:pointer;">그래도 수정</button>
       <button id="kbWarnNo" style="flex:1; min-height:44px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer;">취소</button>
     </div>
   </div>
@@ -395,7 +397,7 @@ function renderList() {
     return;
   }
   $list.innerHTML = items.map((s) => `
-    <button class="row${selected === s.sessionId ? ' active' : ''}${checked.has(s.sessionId) ? ' checked' : ''}" data-id="${esc(s.sessionId)}" role="option" aria-selected="${selected === s.sessionId}">
+    <button class="row${selected === s.sessionId ? ' active' : ''}${checked.has(s.sessionId) ? ' checked' : ''}" data-id="${esc(s.sessionId)}" role="option" aria-selected="${selected === s.sessionId}"${deleteMode ? ` aria-checked="${checked.has(s.sessionId)}"` : ''}>
       <span class="check" aria-hidden="true">${checked.has(s.sessionId) ? '✓' : ''}</span>
       <div class="title">${heavySession(s) ? '<span class="heavy-badge">' + ICONS.bolt + ' 초기화 권장</span>' : ''}${esc(s.title || '(제목 없음)')}</div>
       <div class="meta">
@@ -808,6 +810,12 @@ function closeKbModal() {
 
 document.addEventListener('keydown', (e) => {
   if ($kbWarnOverlay.style.display === 'flex' && e.key === 'Escape') { document.getElementById('kbWarnNo').click(); return; }
+  if (e.key === 'Escape') { // 확인 모달들도 ESC로 닫기
+    if ($delOverlay.style.display === 'flex') { $delOverlay.style.display = 'none'; return; }
+    if ($speedOverlay.style.display === 'flex') { $speedOverlay.style.display = 'none'; return; }
+    const $upd = document.getElementById('updOverlay');
+    if ($upd && $upd.style.display === 'flex') { $upd.style.display = 'none'; return; }
+  }
   if ($kbOverlay.classList.contains('open') && e.key === 'Escape' && !listeningId) { closeKbModal(); return; }
   if (!listeningId) return;
   e.preventDefault();
