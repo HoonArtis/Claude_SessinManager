@@ -56,9 +56,11 @@
   .row:hover { border-color: var(--accent); }
   .row.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .row .title { font-weight: 600; font-size: 15px; margin-bottom: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .row .meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; row-gap: 8px; flex-wrap: wrap; align-items: center; }
+  /* 경로는 한 줄(말줄임), 시간·메시지·토큰은 그 아래 별도 줄 — 배지가 카드 밖으로 밀려나지 않게 */
+  .row .meta { font-size: 12px; color: var(--muted); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; min-width: 0; }
   .row .meta span { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
   .row .meta .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .row .meta .stats { display: flex; gap: 14px; row-gap: 6px; flex-wrap: wrap; align-items: center; }
   .meta .time { color: var(--time); background: var(--time-soft); font-weight: 600; padding: 1px 7px; border-radius: 9px; }
   .meta .tokens { color: var(--token); background: var(--token-soft); font-weight: 600; padding: 1px 7px; border-radius: 9px; }
   .row .check { display: none; position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 6px; background: var(--panel); align-items: center; justify-content: center; color: #fff; }
@@ -398,9 +400,11 @@ function renderList() {
       <div class="title">${heavySession(s) ? '<span class="heavy-badge">' + ICONS.bolt + ' 초기화 권장</span>' : ''}${esc(s.title || '(제목 없음)')}</div>
       <div class="meta">
         <span class="path">${ICONS.folder} ${esc(s.cwd || '(경로 없음)')}</span>
-        <span class="time">${ICONS.clock} ${relTime(s.lastTimestamp)}</span>
-        <span>${ICONS.chat} ${s.messageCount}</span>
-        <span class="tokens" title="사용 토큰 (입력+출력+캐시)">${ICONS.token} ${formatTokens(s.totalTokens)}</span>
+        <span class="stats">
+          <span class="time">${ICONS.clock} ${relTime(s.lastTimestamp)}</span>
+          <span>${ICONS.chat} ${s.messageCount}</span>
+          <span class="tokens" title="사용 토큰 (입력+출력+캐시)">${ICONS.token} ${formatTokens(s.totalTokens)}</span>
+        </span>
       </div>
     </button>`).join('') + (deleteMode ? delBar : '');
   if (deleteMode) {
