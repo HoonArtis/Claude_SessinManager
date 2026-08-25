@@ -44,26 +44,61 @@ function isLoopback(req) {
 }
 
 // ---- 로컬망 자동 발견: UDP 브로드캐스트 비콘 ----
+// 듣기는 항상 (원격 미설정 PC도 켜진 허브를 발견해서 페어링할 수 있게),
+// 알리기는 원격이 켜진 서버만 한다.
 const peers = new Map(); // host -> { name, port, lastSeen }
-if (REMOTE_ON) {
+{
   const udp = dgram.createSocket({ type: 'udp4', reuseAddr: true });
   udp.on('error', () => {});
   udp.on('message', (msg, rinfo) => {
     try {
       const b = JSON.parse(msg.toString('utf8'));
       if (b.t !== 'csm' || b.id === INSTANCE_ID) return;
-      peers.set(rinfo.address, { name: String(b.name || rinfo.address).slice(0, 60), port: b.port === PORT ? PORT : PORT, lastSeen: Date.now() });
+      peers.set(rinfo.address, { name: String(b.name || rinfo.address).slice(0, 60), port: PORT, lastSeen: Date.now() });
     } catch { /* 잘못된 패킷 무시 */ }
   });
   udp.bind(DISCOVERY_PORT, () => {
     try { udp.setBroadcast(true); } catch {}
-    const beacon = () => {
-      const payload = Buffer.from(JSON.stringify({ t: 'csm', id: INSTANCE_ID, name: MY_NAME, port: PORT }));
-      try { udp.send(payload, DISCOVERY_PORT, '255.255.255.255'); } catch {}
-    };
-    beacon();
-    setInterval(beacon, 5000).unref();
+    if (REMOTE_ON) {
+      const beacon = () => {
+        const payload = Buffer.from(JSON.stringify({ t: 'csm', id: INSTANCE_ID, name: MY_NAME, port: PORT }));
+        try { udp.send(payload, DISCOVERY_PORT, '255.255.255.255'); } catch {}
+      };
+      beacon();
+      setInterval(beacon, 5000).unref();
+    }
   });
+}
+
+// ---- 페어링: 코드 한 번 입력으로 상대 PC가 설정 없이 합류 ----
+let pairing = null; // { code, expires, tries }
+
+function writeRemoteConfig(key, name) {
+  const cfg = { ...CONFIG, remote: { enabled: true, key, name } };
+  fs.writeFileSync(path.join(__dirname, 'config.json'), JSON.stringify(cfg, null, 2));
+}
+
+// 방화벽 허용(TCP 7777/UDP 7778)을 관리자 권한으로 시도 — UAC 창이 한 번 뜬다
+function tryFirewallElevated() {
+  // remoteip=localsubnet — 같은 서브넷에서 온 패킷만 허용 (인터넷 발 트래픽은 규칙 차원에서 차단)
+  const rules = 'netsh advfirewall firewall add rule name=CSM_TCP_7777 dir=in action=allow protocol=TCP localport=7777 remoteip=localsubnet & netsh advfirewall firewall add rule name=CSM_UDP_7778 dir=in action=allow protocol=UDP localport=7778 remoteip=localsubnet';
+  try {
+    const child = spawn('powershell', ['-WindowStyle', 'Hidden', '-Command',
+      `Start-Process cmd -ArgumentList '/c ${rules}' -Verb RunAs -WindowStyle Hidden`,
+    ], { detached: true, stdio: 'ignore', windowsHide: true });
+    child.unref();
+  } catch { /* 사용자가 UAC를 거부해도 치명적이지 않음 */ }
+}
+
+// 새 코드로 재시작 (업데이트/페어링 공용)
+function restartSelf() {
+  setTimeout(() => {
+    const child = spawn('wscript', [path.join(__dirname, 'restart.vbs')], {
+      cwd: __dirname, detached: true, stdio: 'ignore',
+    });
+    child.unref();
+    process.exit(0);
+  }, 300);
 }
 
 function freshPeers() {
@@ -197,15 +232,94 @@ function scheduleShutdown(ms) {
 
 const server = http.createServer(async (req, res) => {
   try {
-    // 외부(로컬망)에서 온 요청은 공유 비밀키가 맞아야만 통과
-    if (!isLoopback(req)) {
+    // 외부(로컬망)에서 온 요청은 공유 비밀키가 맞아야만 통과.
+    // 예외: /api/pair-request 는 페어링 코드로 자체 검증한다.
+    if (!isLoopback(req) && req.url !== '/api/pair-request') {
       if (!REMOTE_ON || !keyMatches(req.headers['x-csm-key'])) {
         sendJson(res, 403, { error: '인증 실패: 공유 키가 없거나 일치하지 않습니다.' });
         return;
       }
     }
     if (req.method === 'GET' && req.url === '/api/peers') {
-      sendJson(res, 200, { enabled: REMOTE_ON, name: MY_NAME, peers: REMOTE_ON ? freshPeers() : [] });
+      sendJson(res, 200, { enabled: REMOTE_ON, name: MY_NAME, peers: freshPeers() });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/pair-code') {
+      // (내 브라우저 전용) 5분짜리 일회용 페어링 코드 발급 — 이 코드를 상대 PC에서 입력한다
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      if (!REMOTE_ON) { sendJson(res, 400, { error: '먼저 원격을 켜야 합니다.' }); return; }
+      pairing = { code: String(crypto.randomInt(100000, 1000000)), expires: Date.now() + 5 * 60000, tries: 0 };
+      sendJson(res, 200, { code: pairing.code, expiresInSec: 300 });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/pair-request') {
+      // (상대 PC의 서버가 호출) 코드가 맞으면 공유 키를 넘겨준다 — 일회용, 5회 실패 시 무효화
+      let body;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch {
+        sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' });
+        return;
+      }
+      if (!REMOTE_ON || !pairing || Date.now() > pairing.expires) {
+        sendJson(res, 400, { error: '진행 중인 페어링이 없습니다. 허브 컴퓨터에서 코드를 먼저 발급하세요.' });
+        return;
+      }
+      if (String(body.code || '') !== pairing.code) {
+        pairing.tries += 1;
+        if (pairing.tries >= 5) pairing = null;
+        sendJson(res, 400, { error: '코드가 일치하지 않습니다.' });
+        return;
+      }
+      pairing = null; // 일회용
+      console.log(`페어링 승인: ${body.name || req.socket.remoteAddress}`);
+      sendJson(res, 200, { key: REMOTE.key, name: MY_NAME });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/pair-init') {
+      // (내 브라우저 전용) 이 컴퓨터를 원격 허브로 켠다: 키 생성 + 방화벽 시도 + 재시작
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      if (REMOTE_ON) { sendJson(res, 200, { ok: true, already: true }); return; }
+      writeRemoteConfig(crypto.randomBytes(24).toString('hex'), os.hostname());
+      tryFirewallElevated();
+      sendJson(res, 200, { ok: true });
+      restartSelf();
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/pair-join') {
+      // (내 브라우저 전용) 발견된 허브에 코드로 합류: 키 받아서 저장 + 방화벽 시도 + 재시작
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      let body;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch {
+        sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' });
+        return;
+      }
+      const { host, code } = body || {};
+      if (!peers.has(String(host))) { sendJson(res, 400, { error: '발견된 컴퓨터가 아닙니다.' }); return; }
+      const payload = Buffer.from(JSON.stringify({ code: String(code || ''), name: os.hostname() }));
+      const fwd = http.request({ host, port: PORT, path: '/api/pair-request', method: 'POST', timeout: 8000,
+        headers: { 'Content-Type': 'application/json', 'Content-Length': payload.length } }, (r) => {
+        let data = '';
+        r.on('data', (d) => { data += d; });
+        r.on('end', () => {
+          try {
+            const resp = JSON.parse(data);
+            if (r.statusCode !== 200) { sendJson(res, 400, { error: resp.error || '페어링 실패' }); return; }
+            writeRemoteConfig(resp.key, os.hostname());
+            tryFirewallElevated();
+            sendJson(res, 200, { ok: true, peerName: resp.name });
+            restartSelf();
+          } catch (err) {
+            sendJson(res, 502, { error: '응답 해석 실패: ' + err.message });
+          }
+        });
+      });
+      fwd.on('timeout', () => fwd.destroy(new Error('timeout')));
+      fwd.on('error', (err) => sendJson(res, 502, { error: '허브 연결 실패: ' + err.message }));
+      fwd.write(payload);
+      fwd.end();
       return;
     }
     if (req.method === 'POST' && req.url === '/api/remote') {
@@ -563,15 +677,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       sendJson(res, 200, { ok: true });
-      // 포트가 비워진 뒤 새 프로세스가 뜨도록 예약하고 종료
-      // cmd 경유는 detached 시 콘솔창이 잠깐 보이므로, GUI 앱인 wscript로 창 없이 띄운다
-      setTimeout(() => {
-        const child = spawn('wscript', [path.join(__dirname, 'restart.vbs')], {
-          cwd: __dirname, detached: true, stdio: 'ignore',
-        });
-        child.unref();
-        process.exit(0);
-      }, 300);
+      restartSelf();
       return;
     }
     if (req.method === 'POST' && req.url === '/api/open-backups') {

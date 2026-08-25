@@ -250,6 +250,16 @@
     <button id="updSnooze" style="width:100%; min-height:38px; background:none; color:var(--muted); border:0; font-size:12px; cursor:pointer; text-decoration:underline;">1주일 동안 안 보기</button>
   </div>
 </div>
+<div id="pairOverlay" style="display:none; position:fixed; inset:0; background:rgba(28,33,40,.4); z-index:14; align-items:center; justify-content:center;">
+  <div role="dialog" aria-modal="true" aria-labelledby="pairTitle" style="background:var(--panel); border-radius:12px; padding:24px; width:420px; max-width:calc(100vw - 24px); box-shadow:0 12px 32px rgba(28,33,40,.18);">
+    <h2 id="pairTitle" style="font-size:19px; margin:0 0 8px;"></h2>
+    <div id="pairBody" style="font-size:15px; color:var(--muted); line-height:1.6; margin:0 0 16px;"></div>
+    <div style="display:flex; gap:8px;">
+      <button id="pairOk" style="flex:1; min-height:44px; background:var(--accent); color:#fff; border:0; border-radius:8px; font-size:15px; cursor:pointer;">확인</button>
+      <button id="pairClose" style="flex:1; min-height:44px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:15px; cursor:pointer;">닫기</button>
+    </div>
+  </div>
+</div>
 <div id="kbWarnOverlay" style="display:none; position:fixed; inset:0; background:rgba(28,33,40,.4); z-index:12; align-items:center; justify-content:center;">
   <div role="alertdialog" aria-modal="true" aria-labelledby="kbWarnTitle" style="background:var(--panel); border-radius:12px; padding:24px; width:460px; max-width:calc(100vw - 24px); box-shadow:0 12px 32px rgba(28,33,40,.18);">
     <h2 id="kbWarnTitle" style="font-size:19px; margin:0 0 8px; color:var(--danger);">이 키는 주의가 필요합니다</h2>
@@ -433,21 +443,25 @@ function renderFolderPane(entries) {
     entries.map(([cwd, n]) =>
       `<button class="folder-item${!remotePeer && cur === cwd ? ' active' : ''}" data-cwd="${esc(cwd)}" title="${esc(cwd)}">${ICONS.folder}<span class="fname">${esc(displayName(cwd))}</span><span class="fcount">${n}</span></button>`
     ).join('');
-  if (peersCache.enabled) {
-    html += '<div class="pane-title" style="margin-top: 14px;">다른 컴퓨터</div>';
-    html += peersCache.peers.length
-      ? peersCache.peers.map((p) =>
-          `<button class="folder-item${remotePeer && remotePeer.host === p.host ? ' active' : ''}" data-peer="${esc(p.host)}" data-peername="${esc(p.name)}" title="${esc(p.host)}">🖥<span class="fname">${esc(p.name)}</span></button>`
-        ).join('')
-      : '<div class="pane-empty">발견된 컴퓨터 없음</div>';
-  }
+  html += '<div class="pane-title" style="margin-top: 14px;">다른 컴퓨터</div>';
+  html += peersCache.peers.length
+    ? peersCache.peers.map((p) =>
+        `<button class="folder-item${remotePeer && remotePeer.host === p.host ? ' active' : ''}" data-peer="${esc(p.host)}" data-peername="${esc(p.name)}" title="${esc(p.host)}">🖥<span class="fname">${esc(p.name)}</span></button>`
+      ).join('')
+    : '<div class="pane-empty">발견된 컴퓨터 없음</div>';
+  html += peersCache.enabled
+    ? '<button class="folder-item" id="pairCodeBtn">➕<span class="fname">페어링 코드 표시</span></button>'
+    : '<button class="folder-item" id="pairInitBtn">🔌<span class="fname">이 컴퓨터 원격 켜기</span></button>';
   $pane.innerHTML = html;
 }
 
 document.getElementById('folderPane').addEventListener('click', (e) => {
   const item = e.target.closest('.folder-item');
   if (!item) return;
+  if (item.id === 'pairCodeBtn') { openPairCode(); return; }
+  if (item.id === 'pairInitBtn') { startPairInit(); return; }
   if (item.dataset.peer) {
+    if (!peersCache.enabled) { openJoinModal(item.dataset.peer, item.dataset.peername); return; }
     // 다른 컴퓨터 선택 → 그쪽 세션 목록으로 전환
     remotePeer = { host: item.dataset.peer, name: item.dataset.peername };
     selected = null;
@@ -618,6 +632,85 @@ function startRename(s) {
     if (e.key === 'Enter') doSave();
     if (e.key === 'Escape') { e.stopPropagation(); renderDetail(); }
   };
+}
+
+// ---- 페어링 UI: 설정 파일 없이 코드 한 번으로 연결 ----
+const $pairOverlay = document.getElementById('pairOverlay');
+
+function showPair(title, bodyHtml, okLabel, onOk) {
+  document.getElementById('pairTitle').textContent = title;
+  document.getElementById('pairBody').innerHTML = bodyHtml;
+  const $ok = document.getElementById('pairOk');
+  $ok.hidden = !onOk;
+  if (onOk) { $ok.textContent = okLabel; $ok.onclick = onOk; }
+  $pairOverlay.style.display = 'flex';
+}
+document.getElementById('pairClose').onclick = () => { $pairOverlay.style.display = 'none'; };
+$pairOverlay.addEventListener('click', (e) => { if (e.target === $pairOverlay) $pairOverlay.style.display = 'none'; });
+
+function pollReload() {
+  setTimeout(function p() {
+    fetch('/api/peers').then(() => location.reload()).catch(() => setTimeout(p, 700));
+  }, 2500);
+}
+
+async function openPairCode() {
+  try {
+    const r = await fetch('/api/pair-code', { method: 'POST' });
+    const b = await r.json();
+    if (!r.ok) throw new Error(b.error);
+    showPair('페어링 코드',
+      `<div style="font-size:40px; font-weight:700; letter-spacing:8px; text-align:center; color:var(--text); font-family:Consolas,monospace; margin:12px 0;">${esc(b.code)}</div>
+       <p style="margin:0;">다른 컴퓨터의 세션 매니저 사이드바에서 <b>이 컴퓨터 이름을 클릭</b>하고 5분 안에 이 코드를 입력하면 자동으로 연결됩니다.</p>`, null);
+  } catch (err) {
+    showPair('페어링', esc(err.message), null);
+  }
+}
+
+function startPairInit() {
+  showPair('이 컴퓨터 원격 켜기',
+    `<p style="margin:0 0 8px;">이 컴퓨터를 원격 허브로 켭니다:</p>
+     <ul style="margin:0 0 8px; padding-left:18px;">
+       <li>공유 키를 자동 생성하고 로컬망에 문을 엽니다 (키 인증 필수)</li>
+       <li>방화벽 허용창(UAC)이 뜨면 <b>[예]</b>를 눌러주세요</li>
+       <li>서버가 자동 재시작됩니다</li>
+     </ul>`, '켜기', async () => {
+    try {
+      const r = await fetch('/api/pair-init', { method: 'POST' });
+      const b = await r.json();
+      if (!r.ok) throw new Error(b.error);
+      showPair('원격 켜는 중...', 'UAC 창이 뜨면 [예]를 눌러주세요. 잠시 후 자동 새로고침됩니다.', null);
+      pollReload();
+    } catch (err) {
+      showPair('실패', esc(err.message), null);
+    }
+  });
+}
+
+function openJoinModal(host, name) {
+  showPair(`${name}에 연결`,
+    `<p style="margin:0 0 10px;">허브 컴퓨터(<b>${esc(name)}</b>)에서 [페어링 코드 표시]로 발급한 6자리 코드를 입력하세요.</p>
+     <input id="pairCodeInput" inputmode="numeric" maxlength="6" placeholder="000000"
+       style="width:100%; padding:10px; font-size:24px; letter-spacing:8px; text-align:center; font-family:Consolas,monospace; border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text);">
+     <p id="pairErr" style="color:var(--danger); margin:8px 0 0; min-height:18px;"></p>`, '연결', async () => {
+    const code = document.getElementById('pairCodeInput').value.trim();
+    if (code.length !== 6) { document.getElementById('pairErr').textContent = '6자리 코드를 입력하세요.'; return; }
+    try {
+      const r = await fetch('/api/pair-join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ host, code }),
+      });
+      const b = await r.json();
+      if (!r.ok) throw new Error(b.error);
+      showPair('연결 완료', `<b>${esc(b.peerName)}</b>와 연결되었습니다. 방화벽 허용창(UAC)이 뜨면 [예]를 눌러주세요. 잠시 후 자동 새로고침됩니다.`, null);
+      pollReload();
+    } catch (err) {
+      const $e = document.getElementById('pairErr');
+      if ($e) $e.textContent = err.message; else showPair('실패', esc(err.message), null);
+    }
+  });
+  setTimeout(() => { const $i = document.getElementById('pairCodeInput'); if ($i) $i.focus(); }, 50);
 }
 
 // ---- 원격 세션 상세: 그쪽 화면에서 열기 + 원격 프롬프트(채팅) ----
