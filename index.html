@@ -28,16 +28,40 @@
   .btn-row button:disabled { opacity: .5; cursor: default; }
   #status { margin-top: 8px; font-size: 13px; color: var(--muted); min-height: 18px; }
   #empty-msg { color: var(--muted); text-align: center; margin-top: 40px; }
+  #kbBtn { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; cursor: pointer; }
+  #kbBtn:hover { border-color: var(--accent); }
+  #kbOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 10; }
+  #kbOverlay.open { display: flex; align-items: center; justify-content: center; }
+  #kbModal { background: var(--panel); border-radius: 12px; padding: 24px; width: 520px; max-height: 80vh; overflow-y: auto; }
+  #kbModal h2 { font-size: 15px; margin: 0 0 4px; }
+  #kbModal .hint { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .kb-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .kb-row .kb-label { flex: 1; }
+  .kb-key { min-width: 150px; text-align: center; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); font-family: Consolas, monospace; font-size: 12px; cursor: pointer; }
+  .kb-key.listening { border-color: var(--accent); color: var(--accent); }
+  .kb-key.changed { border-color: var(--accent); }
+  #kbStatus { margin-top: 12px; font-size: 13px; color: var(--muted); min-height: 18px; }
+  #kbClose { margin-top: 12px; width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); cursor: pointer; }
 </style>
 <header>
   <h1>Claude 세션 매니저</h1>
   <input id="search" type="search" placeholder="제목·프롬프트 검색...">
   <label><input id="showEmpty" type="checkbox"> 빈 세션 표시</label>
+  <button id="kbBtn">⌨ 터미널 단축키</button>
 </header>
 <main>
   <div id="list"></div>
   <aside id="detail"></aside>
 </main>
+<div id="kbOverlay">
+  <div id="kbModal">
+    <h2>Windows Terminal 단축키</h2>
+    <div class="hint">키 칸을 클릭한 뒤 원하는 키 조합을 누르면 settings.json에 바로 저장됩니다. (저장 전 자동 백업: settings.json.csm-backup)</div>
+    <div id="kbList"></div>
+    <div id="kbStatus"></div>
+    <button id="kbClose">닫기</button>
+  </div>
+</div>
 <script>
 'use strict';
 let sessions = [];
@@ -151,5 +175,90 @@ $list.addEventListener('click', (e) => {
 });
 $search.addEventListener('input', renderList);
 $showEmpty.addEventListener('change', renderList);
+
+// ---- Windows Terminal 단축키 편집 ----
+const $kbOverlay = document.getElementById('kbOverlay');
+const $kbList = document.getElementById('kbList');
+const $kbStatus = document.getElementById('kbStatus');
+let shortcuts = [];
+let listeningId = null;
+
+function renderShortcuts() {
+  $kbList.innerHTML = shortcuts.map((s) => `
+    <div class="kb-row">
+      <span class="kb-label">${esc(s.label)}</span>
+      <span class="kb-key${listeningId === s.id ? ' listening' : ''}${s.currentKeys !== s.defaultKeys ? ' changed' : ''}" data-id="${esc(s.id)}">
+        ${listeningId === s.id ? '키를 누르세요...' : esc(s.currentKeys)}
+      </span>
+    </div>`).join('');
+}
+
+async function loadShortcuts() {
+  const res = await fetch('/api/wt-keybindings');
+  const body = await res.json();
+  if (!body.available) {
+    $kbList.innerHTML = '<p>Windows Terminal settings.json을 찾을 수 없습니다.</p>';
+    return;
+  }
+  shortcuts = body.shortcuts;
+  renderShortcuts();
+}
+
+// 브라우저 KeyboardEvent를 WT 키 표기로 변환
+function eventToWtKeys(e) {
+  const mods = [];
+  if (e.ctrlKey) mods.push('ctrl');
+  if (e.altKey) mods.push('alt');
+  if (e.shiftKey) mods.push('shift');
+  if (e.metaKey) mods.push('win');
+  const map = { arrowleft: 'left', arrowright: 'right', arrowup: 'up', arrowdown: 'down', '-': 'minus', '=': 'plus', '_': 'minus', '+': 'plus', ' ': 'space' };
+  let key = e.key.toLowerCase();
+  if (['control', 'alt', 'shift', 'meta'].includes(key)) return null; // 수정키만 누른 상태
+  key = map[key] || key;
+  if (!mods.length) return null; // 수정키 없는 단일 키는 오입력 방지를 위해 무시
+  return mods.concat(key).join('+');
+}
+
+async function saveShortcut(id, keys) {
+  $kbStatus.textContent = '저장 중...';
+  try {
+    const res = await fetch('/api/wt-keybindings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, keys }),
+    });
+    const body = await res.json();
+    if (!res.ok) { $kbStatus.textContent = '실패: ' + body.error; return; }
+    shortcuts = body.shortcuts;
+    $kbStatus.textContent = '저장했습니다 — 터미널에 바로 적용됩니다.';
+  } catch (err) {
+    $kbStatus.textContent = '실패: ' + err.message;
+  }
+  renderShortcuts();
+}
+
+$kbList.addEventListener('click', (e) => {
+  const el = e.target.closest('.kb-key');
+  if (!el) return;
+  listeningId = listeningId === el.dataset.id ? null : el.dataset.id;
+  $kbStatus.textContent = listeningId ? '원하는 키 조합을 누르세요 (수정키 + 키). ESC로 취소.' : '';
+  renderShortcuts();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!listeningId) return;
+  e.preventDefault();
+  if (e.key === 'Escape') { listeningId = null; $kbStatus.textContent = ''; renderShortcuts(); return; }
+  const keys = eventToWtKeys(e);
+  if (!keys) return;
+  const id = listeningId;
+  listeningId = null;
+  saveShortcut(id, keys);
+});
+
+document.getElementById('kbBtn').onclick = () => { $kbOverlay.classList.add('open'); loadShortcuts(); };
+document.getElementById('kbClose').onclick = () => { listeningId = null; $kbOverlay.classList.remove('open'); };
+$kbOverlay.addEventListener('click', (e) => { if (e.target === $kbOverlay) { listeningId = null; $kbOverlay.classList.remove('open'); } });
+
 load();
 </script>
