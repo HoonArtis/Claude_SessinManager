@@ -133,6 +133,13 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, { ok: true, shortcuts: getKeybindings(updated) });
       return;
     }
+    if (req.method === 'POST' && req.url === '/api/open-backups') {
+      const dir = path.join(PROJECTS_DIR, '.csm-session-backups');
+      fs.mkdirSync(dir, { recursive: true });
+      openFolder(dir);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
     if (req.method === 'POST' && req.url === '/api/speedup') {
       let body;
       try {

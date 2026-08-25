@@ -42,6 +42,8 @@
   #delCancelBtn { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
   #delBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; color: var(--text); cursor: pointer; }
   #delBtn:hover, body.delete-mode #delBtn { border-color: #c0392b; color: #c0392b; }
+  #backupBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; color: var(--text); cursor: pointer; }
+  #backupBtn:hover { border-color: var(--accent); color: var(--accent); }
   #detail { width: 40%; min-width: 320px; max-width: 560px; background: var(--panel); border-left: 1px solid var(--border); padding: 20px; overflow-y: auto; display: none; }
   #detail.open { display: block; }
   #detail .detail-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
@@ -97,6 +99,7 @@
   <label><input id="showEmpty" type="checkbox"> 빈 세션 표시</label>
   <button id="kbBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></svg> 터미널 단축키</button>
   <button id="delBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> 삭제</button>
+  <button id="backupBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 10v5M9.5 12.5 12 15l2.5-2.5"/></svg> 백업 폴더</button>
 </header>
 <main>
   <div id="list" role="listbox" aria-label="세션 목록"></div>
@@ -483,6 +486,9 @@ document.addEventListener('keydown', (e) => {
   saveShortcut(id, keys);
 });
 
+document.getElementById('backupBtn').onclick = () => {
+  fetch('/api/open-backups', { method: 'POST' });
+};
 document.getElementById('kbBtn').onclick = () => { $kbOverlay.classList.add('open'); loadShortcuts(); };
 document.getElementById('kbClose').onclick = closeKbModal;
 $kbOverlay.addEventListener('click', (e) => { if (e.target === $kbOverlay) closeKbModal(); });
