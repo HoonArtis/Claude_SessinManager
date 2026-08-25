@@ -170,6 +170,7 @@ const server = http.createServer(async (req, res) => {
         commit: BOOT_COMMIT,
         behind: count('HEAD..origin/master'),
         restart: BOOT_COMMIT ? count(`${BOOT_COMMIT}..HEAD`) : 0,
+        clients: aliveClients, // 서버를 붙잡고 있는 열린 탭 수
       });
       return;
     }
