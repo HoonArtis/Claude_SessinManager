@@ -89,7 +89,10 @@
   .kb-group { font-size: 12px; color: var(--muted); text-transform: none; margin: 16px 0 4px; font-weight: 600; }
   .kb-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
   .kb-row .kb-label { flex: 1; }
-  .kb-key { min-width: 150px; min-height: 40px; text-align: center; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-family: Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
+  .kb-key { min-width: 150px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-family: Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
+  .kb-key kbd { font: inherit; text-transform: capitalize; background: var(--panel); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 5px; padding: 2px 7px; color: var(--text); }
+  .kb-key .plus { color: var(--muted); margin: 0 6px; font-weight: 400; }
+  .kb-key.changed kbd { border-color: var(--accent); color: var(--accent); }
   .kb-key:hover { border-color: var(--accent); }
   .kb-key.listening { border-color: var(--accent); color: var(--accent); }
   .kb-key.changed { border-color: var(--accent); }
@@ -489,9 +492,17 @@ let shortcuts = [];
 let listeningId = null;
 
 // WT 키 표기를 읽기 좋은 기호로 변환 (표시 전용 — 저장은 WT 형식 그대로)
+const KEY_SYMBOLS = { minus: '-', plus: '+', left: '←', right: '→', up: '↑', down: '↓' };
+
 function prettyKeys(keys) {
-  const symbols = { minus: '-', plus: '+', left: '←', right: '→', up: '↑', down: '↓' };
-  return keys.split('+').map((k) => symbols[k] || k).join('+');
+  return keys.split('+').map((k) => KEY_SYMBOLS[k] || k).join('+');
+}
+
+// 키마다 키캡을 그리고, 조합을 뜻하는 +는 흐리게 띄워서 구분한다
+function prettyKeysHtml(keys) {
+  return keys.split('+')
+    .map((k) => `<kbd>${esc(KEY_SYMBOLS[k] || k)}</kbd>`)
+    .join('<span class="plus">+</span>');
 }
 
 function renderShortcuts() {
@@ -503,7 +514,7 @@ function renderShortcuts() {
     <div class="kb-row">
       <span class="kb-label">${esc(s.label)}</span>
       <button class="kb-key${listeningId === s.id ? ' listening' : ''}${s.currentKeys !== s.defaultKeys ? ' changed' : ''}" data-id="${esc(s.id)}" aria-label="${esc(s.label)} 단축키 변경, 현재 ${esc(prettyKeys(s.currentKeys))}">
-        ${listeningId === s.id ? '키를 누르세요...' : esc(prettyKeys(s.currentKeys))}
+        ${listeningId === s.id ? '키를 누르세요...' : prettyKeysHtml(s.currentKeys)}
       </button>
     </div>`;
   }).join('');
