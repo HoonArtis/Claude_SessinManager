@@ -7,7 +7,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const { scanSessions } = require('./lib/scan-sessions');
 const { getKeybindings, setKeybinding } = require('./lib/wt-keybindings');
 const { trashSessions } = require('./lib/trash-sessions');
-const { parseSession, extractUserPrompts } = require('./lib/parse-session');
+const { parseSession, extractUserPrompts, extractConversation } = require('./lib/parse-session');
 const { buildHandoffMd } = require('./lib/handoff');
 
 const SAFE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
@@ -142,6 +142,23 @@ const server = http.createServer(async (req, res) => {
       fs.writeFileSync(settingsPath + '.csm-backup', original);
       fs.writeFileSync(settingsPath, updated);
       sendJson(res, 200, { ok: true, shortcuts: getKeybindings(updated) });
+      return;
+    }
+    if (req.method === 'GET' && req.url.startsWith('/api/conversation?')) {
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const projectDir = params.get('projectDir') || '';
+      const sessionId = params.get('sessionId') || '';
+      if (!SAFE_NAME_RE.test(projectDir) || !SAFE_NAME_RE.test(sessionId) ||
+          ['.', '..'].includes(projectDir) || ['.', '..'].includes(sessionId)) {
+        sendJson(res, 400, { error: '세션 정보가 올바르지 않습니다.' });
+        return;
+      }
+      const src = path.join(PROJECTS_DIR, projectDir, sessionId + '.jsonl');
+      if (!fs.existsSync(src)) {
+        sendJson(res, 400, { error: '세션 파일을 찾을 수 없습니다.' });
+        return;
+      }
+      sendJson(res, 200, { turns: extractConversation(fs.readFileSync(src, 'utf8'), 40) });
       return;
     }
     if (req.method === 'POST' && req.url === '/api/open-backups') {

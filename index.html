@@ -75,6 +75,12 @@
   #speedupBtn { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
   #speedupBtn:hover { background: var(--accent); color: #fff; }
   .speedup-hint { font-size: 12px; color: var(--accent); margin: 8px 0 0; }
+  #convBtn { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+  #convBtn:hover { border-color: var(--accent); color: var(--accent); }
+  #convList { margin-top: 10px; max-height: 340px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+  .conv-user { align-self: flex-end; max-width: 88%; background: var(--accent-soft); color: var(--text); border-radius: 12px 12px 3px 12px; padding: 8px 12px; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+  .conv-assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); color: var(--muted); border-radius: 12px 12px 12px 3px; padding: 4px 14px; font-size: 15px; letter-spacing: 2px; }
+  .conv-loading { font-size: 13px; color: var(--muted); margin: 0; }
   .open-mode { display: flex; align-items: center; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
   .open-mode-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
   .mode-btn { min-height: 34px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 12px; color: var(--muted); cursor: pointer; }
@@ -349,6 +355,10 @@ function renderDetail() {
       <button id="speedupBtn"${s.cwd ? '' : ' disabled'}>${ICONS.bolt} 세션 초기화 (속도업)</button>
     </div>
     ${heavySession(s) ? '<p class="speedup-hint">이 세션은 메시지가 많아 컨텍스트 오염 가능성이 있습니다. 초기화를 권장합니다.</p>' : ''}
+    <div class="btn-row">
+      <button id="convBtn">${ICONS.chat} 최근 대화 보기</button>
+    </div>
+    <div id="convList" hidden></div>
     <div id="status" role="status" aria-live="polite"></div>`;
   document.getElementById('resumeBtn').onclick = () => callApi('/api/resume', s, '터미널을 열었습니다.');
   document.getElementById('openBtn').onclick = () => callApi('/api/open-folder', s, '탐색기를 열었습니다.');
@@ -360,7 +370,31 @@ function renderDetail() {
     };
   });
   document.getElementById('speedupBtn').onclick = () => openSpeedupConfirm(s);
+  document.getElementById('convBtn').onclick = () => toggleConversation(s);
   document.getElementById('detailClose').onclick = () => { selected = null; renderList(); renderDetail(); };
+}
+
+// 최근 대화: 내 메시지는 전문, Claude 응답은 "…"으로 접어서 보여준다
+async function toggleConversation(s) {
+  const $conv = document.getElementById('convList');
+  if (!$conv.hidden) { $conv.hidden = true; return; }
+  $conv.hidden = false;
+  $conv.innerHTML = '<p class="conv-loading">불러오는 중...</p>';
+  try {
+    const res = await fetch(`/api/conversation?projectDir=${encodeURIComponent(s.projectDir)}&sessionId=${encodeURIComponent(s.sessionId)}`);
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    if (!body.turns.length) {
+      $conv.innerHTML = '<p class="conv-loading">표시할 대화가 없습니다.</p>';
+      return;
+    }
+    $conv.innerHTML = body.turns.map((t) => t.role === 'user'
+      ? `<div class="conv-user">${esc(t.text)}</div>`
+      : '<div class="conv-assistant" title="Claude 응답 (생략)">…</div>').join('');
+    $conv.scrollTop = $conv.scrollHeight;
+  } catch (err) {
+    $conv.innerHTML = `<p class="conv-loading">실패: ${esc(err.message)}</p>`;
+  }
 }
 
 function getOpenMode() {
