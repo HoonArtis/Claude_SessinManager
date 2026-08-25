@@ -58,6 +58,7 @@ setTimeout(() => {
 
 const WT_SETTINGS_CANDIDATES = [
   path.join(process.env.LOCALAPPDATA || '', 'Packages', 'Microsoft.WindowsTerminal_8wekyb3d8bbwe', 'LocalState', 'settings.json'),
+  path.join(process.env.LOCALAPPDATA || '', 'Packages', 'Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe', 'LocalState', 'settings.json'),
   path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'Windows Terminal', 'settings.json'),
 ];
 
@@ -221,9 +222,10 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const { id, keys } = body || {};
-      // keys가 null이면 "등록 안 함"(해제) 요청이다
-      if (!id || (keys !== null && (!keys || !/^[a-z0-9+,\-=]+$/i.test(keys)))) {
-        sendJson(res, 400, { error: '단축키 형식이 올바르지 않습니다.' });
+      // keys가 null이면 "등록 안 함"(해제) 요청이다.
+      // 키 이름에는 [ ] ; . / 같은 문자도 오므로 출력 가능한 ASCII면 허용한다 (JSON에만 기록되므로 안전)
+      if (!id || (keys !== null && (typeof keys !== 'string' || !/^[\x21-\x7e]{1,64}$/.test(keys)))) {
+        sendJson(res, 400, { error: '단축키 형식이 올바르지 않습니다: ' + JSON.stringify(keys) });
         return;
       }
       const settingsPath = wtSettingsPath();

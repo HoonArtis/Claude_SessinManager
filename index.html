@@ -753,6 +753,8 @@ function eventToWtKeys(e) {
   let key = e.key.toLowerCase();
   if (['control', 'alt', 'shift', 'meta'].includes(key)) return null; // 수정키만 누른 상태
   key = map[key] || key;
+  // 한글 IME 상태에서 오는 조합 중간 키('process')나 한글 자모 등 비ASCII 키는 무시
+  if (key === 'process' || key === 'hangulmode' || !/^[\x21-\x7e]+$/.test(key)) return null;
   // 수정키 없는 단일 키는 오입력 방지를 위해 무시 (F1~F24 기능키는 예외)
   if (!mods.length && !/^f\d{1,2}$/.test(key)) return null;
   return mods.concat(key).join('+');

@@ -34,9 +34,9 @@ test('setKeybinding은 새 항목을 추가하고 기본 키를 unbind한다', (
   const text = settings([]);
   const out = JSON.parse(setKeybinding(text, 'Terminal.ClosePane', 'ctrl+alt+w'));
   const entry = out.keybindings.find((k) => k.id === 'Terminal.ClosePane');
-  const unbound = out.keybindings.find((k) => k.id === null && k.keys === 'ctrl+shift+w');
+  const unbound = out.keybindings.find((k) => k.command === 'unbound' && k.keys === 'ctrl+shift+w');
   assert.strictEqual(entry.keys, 'ctrl+alt+w');
-  assert.ok(unbound, '기본 키 ctrl+shift+w가 unbind되어야 한다');
+  assert.ok(unbound, '기본 키 ctrl+shift+w가 구버전 호환 형식(command:unbound)으로 unbind되어야 한다');
 });
 
 test('setKeybinding은 같은 id의 기존 오버라이드와 새 키와 충돌하는 항목을 제거한다', () => {
@@ -58,7 +58,7 @@ test('기본 키가 없는 단축키(SwapPane 등)는 currentKeys가 null이고,
   const out = JSON.parse(setKeybinding(text, 'Terminal.SwapPaneLeft', 'ctrl+alt+left'));
   const entry = out.keybindings.find((k) => k.id === 'Terminal.SwapPaneLeft');
   assert.strictEqual(entry.keys, 'ctrl+alt+left');
-  assert.ok(!out.keybindings.some((k) => k.id === null), '기본 키가 없으니 unbind 항목이 없어야 한다');
+  assert.ok(!out.keybindings.some((k) => k.id === null || k.command === 'unbound'), '기본 키가 없으니 unbind 항목이 없어야 한다');
 });
 
 test('unsetKeybinding은 오버라이드를 제거하고 기본 키를 unbind해서 currentKeys가 null이 된다', () => {
@@ -66,7 +66,7 @@ test('unsetKeybinding은 오버라이드를 제거하고 기본 키를 unbind해
   const updated = unsetKeybinding(text, 'Terminal.ClosePane');
   const out = JSON.parse(updated);
   assert.ok(!out.keybindings.some((k) => k.id === 'Terminal.ClosePane'), '오버라이드가 제거되어야 한다');
-  assert.ok(out.keybindings.some((k) => k.id === null && k.keys === 'ctrl+shift+w'), '기본 키가 unbind되어야 한다');
+  assert.ok(out.keybindings.some((k) => k.command === 'unbound' && k.keys === 'ctrl+shift+w'), '기본 키가 unbind되어야 한다');
   const close = getKeybindings(updated).find((s) => s.id === 'Terminal.ClosePane');
   assert.strictEqual(close.currentKeys, null);
 });
@@ -75,14 +75,20 @@ test('unsetKeybinding: 기본 키가 없는 단축키는 오버라이드만 제�
   const text = settings([{ id: 'Terminal.SwapPaneLeft', keys: 'ctrl+alt+left' }]);
   const out = JSON.parse(unsetKeybinding(text, 'Terminal.SwapPaneLeft'));
   assert.ok(!out.keybindings.some((k) => k.id === 'Terminal.SwapPaneLeft'));
-  assert.ok(!out.keybindings.some((k) => k.id === null));
+  assert.ok(!out.keybindings.some((k) => k.id === null || k.command === 'unbound'));
 });
 
 test('unsetKeybinding을 두 번 해도 unbind 항목이 중복되지 않는다', () => {
   const once = unsetKeybinding(settings([]), 'Terminal.ClosePane');
   const twice = JSON.parse(unsetKeybinding(once, 'Terminal.ClosePane'));
-  const unbinds = twice.keybindings.filter((k) => k.id === null && k.keys === 'ctrl+shift+w');
+  const unbinds = twice.keybindings.filter((k) => (k.id === null || k.command === 'unbound') && k.keys === 'ctrl+shift+w');
   assert.strictEqual(unbinds.length, 1);
+});
+
+test('getKeybindings: 구형 command:unbound 형식의 해제 항목도 인식한다', () => {
+  const text = settings([{ command: 'unbound', keys: 'ctrl+shift+w' }]);
+  const close = getKeybindings(text).find((s) => s.id === 'Terminal.ClosePane');
+  assert.strictEqual(close.currentKeys, null);
 });
 
 test('unsetKeybinding: 기본 키를 다른 명령이 쓰고 있으면 unbind 항목을 추가하지 않는다', () => {
