@@ -13,6 +13,8 @@
   .icon { width: 14px; height: 14px; vertical-align: -2px; flex: none; }
   header { padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   header h1 { font-size: 16px; margin: 0; letter-spacing: -0.01em; }
+  .ver { font-size: 11px; color: var(--muted); font-family: Consolas, monospace; }
+  .ver.behind { color: var(--token); background: var(--token-soft); padding: 2px 8px; border-radius: 9px; font-weight: 600; }
   #search { flex: 1; min-width: 160px; max-width: 480px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg); caret-color: var(--accent); }
   #search:focus { outline: 2px solid var(--accent); outline-offset: 0; background: var(--panel); }
   header label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; min-height: 44px; cursor: pointer; }
@@ -141,6 +143,7 @@
 </style>
 <header>
   <h1>Claude 세션 매니저</h1>
+  <span id="ver" class="ver" title="실행 중인 버전"></span>
   <input id="search" type="search" placeholder="제목·프롬프트 검색..." aria-label="세션 제목과 프롬프트 검색">
   <label><input id="showEmpty" type="checkbox"> 빈 세션 표시</label>
   <button id="kbBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></svg> 터미널 단축키</button>
@@ -863,6 +866,18 @@ $kbOverlay.addEventListener('click', (e) => { if (e.target === $kbOverlay) close
 
 // 서버 생존 신호 — 이 페이지(탭)들이 모두 닫히면 서버가 스스로 꺼진다
 new EventSource('/api/alive');
+
+// 실행 중인 버전 표시 — 원격에 새 커밋이 있으면 배지로 알림 (받기는 바로가기 재실행이 담당)
+fetch('/api/version').then((r) => r.json()).then((v) => {
+  const $v = document.getElementById('ver');
+  if (!v.commit) return;
+  if (v.behind > 0) {
+    $v.textContent = `${v.commit} · 업데이트 ${v.behind}건 — 바로가기로 다시 실행하면 적용`;
+    $v.classList.add('behind');
+  } else {
+    $v.textContent = `${v.commit} · 최신`;
+  }
+}).catch(() => {});
 
 load();
 </script>

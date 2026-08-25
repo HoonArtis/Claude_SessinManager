@@ -134,6 +134,17 @@ const server = http.createServer(async (req, res) => {
       res.end(html);
       return;
     }
+    if (req.method === 'GET' && req.url === '/api/version') {
+      // 실행 중인 버전과, 마지막 fetch 기준 원격에 밀린 커밋 수 (fetch는 launch.vbs의 git pull이 담당)
+      const opts = { cwd: __dirname, windowsHide: true, encoding: 'utf8' };
+      const head = spawnSync('git', ['rev-parse', '--short', 'HEAD'], opts);
+      const behind = spawnSync('git', ['rev-list', '--count', 'HEAD..origin/master'], opts);
+      sendJson(res, 200, {
+        commit: head.status === 0 ? head.stdout.trim() : null,
+        behind: behind.status === 0 ? parseInt(behind.stdout.trim(), 10) || 0 : 0,
+      });
+      return;
+    }
     if (req.method === 'GET' && req.url === '/api/sessions') {
       sendJson(res, 200, scanSessions(PROJECTS_DIR, cache));
       return;
