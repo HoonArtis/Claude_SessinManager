@@ -42,29 +42,40 @@ function wtSettingsPath() {
   return WT_SETTINGS_CANDIDATES.find((p) => fs.existsSync(p)) || null;
 }
 
-function launchResume(cwd, sessionId) {
-  const claudeCmd = `claude --resume ${sessionId}`;
-  const child = hasWt
-    ? spawn('wt', ['-d', cwd, 'cmd', '/k', claudeCmd], { detached: true, stdio: 'ignore' })
-    : spawn('cmd', ['/c', 'start', '"claude"', 'cmd', '/k', `cd /d "${cwd}" && ${claudeCmd}`], {
-        detached: true,
-        stdio: 'ignore',
-        shell: false,
-      });
+// 열기 방식: window(새 창) / tab(기존 창 새 탭) / split-right(오른쪽 분할) / split-down(아래 분할)
+const OPEN_MODES = {
+  window: ['-w', 'new', 'nt'],
+  tab: ['-w', '0', 'nt'],
+  'split-right': ['-w', '0', 'sp', '-V'],
+  'split-down': ['-w', '0', 'sp', '-H'],
+};
+
+function normalizeMode(mode) {
+  return OPEN_MODES[mode] ? mode : 'tab';
+}
+
+function launchInTerminal(cwd, claudeCmd, mode) {
+  let child;
+  if (hasWt) {
+    const openArgs = OPEN_MODES[normalizeMode(mode)];
+    child = spawn('wt', [...openArgs, '-d', cwd, 'cmd', '/k', claudeCmd], { detached: true, stdio: 'ignore' });
+  } else {
+    child = spawn('cmd', ['/c', 'start', '"claude"', 'cmd', '/k', `cd /d "${cwd}" && ${claudeCmd}`], {
+      detached: true,
+      stdio: 'ignore',
+      shell: false,
+    });
+  }
   child.unref();
 }
 
+function launchResume(cwd, sessionId, mode) {
+  launchInTerminal(cwd, `claude --resume ${sessionId}`, mode);
+}
+
 // 새 터미널에서 fresh claude 세션을 열고 핸드오프 문서부터 읽게 한다
-function launchFreshClaude(cwd) {
-  const claudeCmd = 'claude "CLAUDE-HANDOFF.md 파일을 읽고 맥락을 파악한 뒤 다음 해야 할 일부터 이어서 작업해줘"';
-  const child = hasWt
-    ? spawn('wt', ['-d', cwd, 'cmd', '/k', claudeCmd], { detached: true, stdio: 'ignore' })
-    : spawn('cmd', ['/c', 'start', '"claude"', 'cmd', '/k', `cd /d "${cwd}" && ${claudeCmd}`], {
-        detached: true,
-        stdio: 'ignore',
-        shell: false,
-      });
-  child.unref();
+function launchFreshClaude(cwd, mode) {
+  launchInTerminal(cwd, 'claude "CLAUDE-HANDOFF.md 파일을 읽고 맥락을 파악한 뒤 다음 해야 할 일부터 이어서 작업해줘"', mode);
 }
 
 function openFolder(cwd) {
@@ -177,7 +188,7 @@ const server = http.createServer(async (req, res) => {
       });
       fs.writeFileSync(handoffPath, md, 'utf8');
       // 3) 새 터미널에서 fresh 세션 시작
-      launchFreshClaude(meta.cwd);
+      launchFreshClaude(meta.cwd, body.mode);
       sendJson(res, 200, { ok: true, handoffPath, backupPath });
       return;
     }
@@ -217,7 +228,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       if (!validCwd(res, cwd)) return;
-      launchResume(cwd, sessionId);
+      launchResume(cwd, sessionId, body.mode);
       sendJson(res, 200, { ok: true });
       return;
     }
