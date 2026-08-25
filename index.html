@@ -855,6 +855,8 @@ async function load() {
       sessions = [];
       const $count = document.getElementById('filterCount');
       if ($count) $count.textContent = '원격 연결 실패: ' + err.message;
+      // 키가 서로 달라 거부된 경우 → 코드로 다시 페어링하도록 입력창을 바로 띄운다
+      if (String(err.message).includes('인증')) openJoinModal(remotePeer.host, remotePeer.name);
     }
   } else {
     const res = await fetch('/api/sessions');
