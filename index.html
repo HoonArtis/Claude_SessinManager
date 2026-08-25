@@ -19,6 +19,16 @@
   header input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
   #kbBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; color: var(--text); cursor: pointer; }
   #kbBtn:hover { border-color: var(--accent); color: var(--accent); }
+  #filterBar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  .chips { display: flex; gap: 4px; }
+  .chip { min-height: 36px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 18px; background: var(--panel); font-size: 13px; color: var(--muted); cursor: pointer; }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #filterBar select { min-height: 36px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; color: var(--text); max-width: 320px; }
+  .heavy-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; min-height: 36px; }
+  .heavy-toggle input { accent-color: var(--accent); width: 15px; height: 15px; }
+  #filterCount { margin-left: auto; font-size: 12px; color: var(--muted); }
+  @media (max-width: 768px) { #filterBar { padding: 8px 12px; } #filterCount { display: none; } }
   main { flex: 1; display: flex; min-height: 0; }
   #list { flex: 1; overflow-y: auto; padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; align-content: start; }
   .row { position: relative; text-align: left; font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; cursor: pointer; display: block; min-height: 72px; }
@@ -101,6 +111,23 @@
   <button id="delBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> 삭제</button>
   <button id="backupBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 10v5M9.5 12.5 12 15l2.5-2.5"/></svg> 백업 폴더</button>
 </header>
+<div id="filterBar">
+  <div class="chips" role="group" aria-label="기간 필터">
+    <button class="chip active" data-period="all">전체</button>
+    <button class="chip" data-period="today">오늘</button>
+    <button class="chip" data-period="7d">최근 7일</button>
+    <button class="chip" data-period="30d">최근 30일</button>
+  </div>
+  <select id="folderFilter" aria-label="폴더 필터"><option value="">모든 폴더</option></select>
+  <select id="sortBy" aria-label="정렬">
+    <option value="recent">최근 활동순</option>
+    <option value="messages">메시지 많은 순</option>
+    <option value="tokens">토큰 많은 순</option>
+    <option value="name">이름순</option>
+  </select>
+  <label class="heavy-toggle"><input id="heavyOnly" type="checkbox"> 초기화 권장만</label>
+  <span id="filterCount" role="status" aria-live="polite"></span>
+</div>
 <main>
   <div id="list" role="listbox" aria-label="세션 목록"></div>
   <aside id="detail" aria-label="세션 상세"></aside>
@@ -159,6 +186,7 @@ const ICONS = {
   open: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H7l-2 8H3V7z"/><path d="M7 10h14l-2 8H5l2-8z"/></svg>',
   close: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   bolt: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>',
+  token: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M8.5 9.5c0-1.4 1.5-2.2 3.5-2.2s3.5.8 3.5 2.2-1.5 2-3.5 2.3-3.5.9-3.5 2.2 1.5 2.2 3.5 2.2 3.5-.8 3.5-2.2"/></svg>',
 };
 
 // 메시지가 많은 세션은 컨텍스트 오염(자동 압축, 응답 지연) 가능성이 높다
@@ -185,14 +213,65 @@ function esc(s) {
   return div.innerHTML;
 }
 
+let periodFilter = 'all';
+const PERIOD_MS = { today: 0, '7d': 7 * 86400000, '30d': 30 * 86400000 };
+
+function periodCutoff() {
+  if (periodFilter === 'all') return null;
+  if (periodFilter === 'today') {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
+  return Date.now() - PERIOD_MS[periodFilter];
+}
+
+function formatTokens(n) {
+  if (!n) return '0';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1000) return Math.round(n / 1000) + 'k';
+  return String(n);
+}
+
 function visible() {
   const q = $search.value.trim().toLowerCase();
-  return sessions.filter((s) => {
+  const cutoff = periodCutoff();
+  const folder = document.getElementById('folderFilter').value;
+  const heavyOnly = document.getElementById('heavyOnly').checked;
+  const sortBy = document.getElementById('sortBy').value;
+  const items = sessions.filter((s) => {
     if (s.empty && !$showEmpty.checked) return false;
+    if (cutoff && (!s.lastTimestamp || new Date(s.lastTimestamp).getTime() < cutoff)) return false;
+    if (folder && s.cwd !== folder) return false;
+    if (heavyOnly && !heavySession(s)) return false;
     if (!q) return true;
     return [s.title, s.firstPrompt, s.lastPrompt, s.cwd]
       .some((f) => f && f.toLowerCase().includes(q));
   });
+  const sorters = {
+    recent: (a, b) => (b.lastTimestamp || '').localeCompare(a.lastTimestamp || ''),
+    messages: (a, b) => b.messageCount - a.messageCount,
+    tokens: (a, b) => (b.totalTokens || 0) - (a.totalTokens || 0),
+    name: (a, b) => (a.title || '').localeCompare(b.title || '', 'ko'),
+  };
+  items.sort(sorters[sortBy] || sorters.recent);
+  const $count = document.getElementById('filterCount');
+  if ($count) $count.textContent = `${items.length} / ${sessions.length}개 세션`;
+  return items;
+}
+
+function populateFolderFilter() {
+  const $folder = document.getElementById('folderFilter');
+  const prev = $folder.value;
+  const counts = new Map();
+  for (const s of sessions) {
+    if (!s.cwd) continue;
+    counts.set(s.cwd, (counts.get(s.cwd) || 0) + 1);
+  }
+  const entries = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  $folder.innerHTML = '<option value="">모든 폴더</option>' +
+    entries.map(([cwd, n]) => `<option value="${esc(cwd)}">${esc(cwd)} (${n})</option>`).join('');
+  if ([...$folder.options].some((o) => o.value === prev)) $folder.value = prev;
 }
 
 function renderList() {
@@ -215,6 +294,7 @@ function renderList() {
         <span class="path">${ICONS.folder} ${esc(s.cwd || '(경로 없음)')}</span>
         <span>${ICONS.clock} ${relTime(s.lastTimestamp)}</span>
         <span>${ICONS.chat} ${s.messageCount}</span>
+        <span title="사용 토큰 (입력+출력+캐시)">${ICONS.token} ${formatTokens(s.totalTokens)}</span>
       </div>
     </button>`).join('') + (deleteMode ? delBar : '');
   if (deleteMode) {
@@ -238,6 +318,7 @@ function renderDetail() {
       <dt>작업 폴더</dt><dd>${esc(s.cwd || '-')}</dd>
       <dt>마지막 활동</dt><dd>${relTime(s.lastTimestamp)} (${esc(s.lastTimestamp || '-')})</dd>
       <dt>작업 시간</dt><dd>약 ${durMin}분 · 메시지 ${s.messageCount}개</dd>
+      <dt>사용 토큰</dt><dd>${formatTokens(s.totalTokens)} (입력+출력+캐시 합산)</dd>
       <dt>git 브랜치</dt><dd>${esc(s.gitBranch || '-')}</dd>
       <dt>첫 프롬프트</dt><dd>${esc((s.firstPrompt || '-').slice(0, 1000))}</dd>
       <dt>마지막 프롬프트</dt><dd>${esc((s.lastPrompt || '-').slice(0, 1000))}</dd>
@@ -277,9 +358,21 @@ async function callApi(url, s, okMsg) {
 async function load() {
   const res = await fetch('/api/sessions');
   sessions = await res.json();
+  populateFolderFilter();
   renderList();
   renderDetail();
 }
+
+document.querySelectorAll('.chip').forEach((chip) => {
+  chip.addEventListener('click', () => {
+    periodFilter = chip.dataset.period;
+    document.querySelectorAll('.chip').forEach((c) => c.classList.toggle('active', c === chip));
+    renderList();
+  });
+});
+document.getElementById('folderFilter').addEventListener('change', renderList);
+document.getElementById('sortBy').addEventListener('change', renderList);
+document.getElementById('heavyOnly').addEventListener('change', renderList);
 
 $list.addEventListener('click', (e) => {
   const row = e.target.closest('.row');

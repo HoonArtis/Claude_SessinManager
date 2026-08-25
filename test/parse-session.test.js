@@ -89,4 +89,15 @@ test('빈 텍스트는 모두 null인 empty 세션을 반환한다', () => {
   assert.strictEqual(s.empty, true);
   assert.strictEqual(s.title, null);
   assert.strictEqual(s.messageCount, 0);
+  assert.strictEqual(s.totalTokens, 0);
+});
+
+test('assistant 레코드의 usage를 합산해 totalTokens를 계산한다', () => {
+  const text = [
+    line({ type: 'assistant', message: { role: 'assistant', content: [], usage: { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 1000, cache_read_input_tokens: 5000 } } }),
+    line({ type: 'assistant', message: { role: 'assistant', content: [], usage: { input_tokens: 10, output_tokens: 40 } } }),
+    line({ type: 'assistant', message: { role: 'assistant', content: [] } }),
+  ].join('\n');
+  const s = parseSession(text);
+  assert.strictEqual(s.totalTokens, 6200);
 });
