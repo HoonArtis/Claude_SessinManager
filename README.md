@@ -46,6 +46,38 @@ node server.js
   2. 기존 세션을 `~/.claude/projects/.csm-session-backups/`에 보관
   3. 새 터미널에서 fresh Claude 세션이 핸드오프 문서를 읽고 시작
 
+## 원격 (다른 컴퓨터의 세션 보기·조종)
+
+같은 로컬망의 PC들이 서로의 세션을 보고, 원격으로 터미널을 열고,
+프롬프트를 보내 응답을 받아볼 수 있습니다. 기본은 꺼져 있습니다.
+
+**설정 (각 PC에서 1회):**
+
+1. 앱 폴더에 `config.json` 생성 — **모든 PC에 같은 key**를 넣습니다:
+
+   ```json
+   { "remote": { "enabled": true, "key": "긴-공유-비밀키", "name": "이 PC 표시이름" } }
+   ```
+
+2. 방화벽 허용 (관리자 PowerShell):
+
+   ```
+   netsh advfirewall firewall add rule name="CSM TCP" dir=in action=allow protocol=TCP localport=7777
+   netsh advfirewall firewall add rule name="CSM UDP" dir=in action=allow protocol=UDP localport=7778
+   ```
+
+3. 각 PC에서 세션 매니저 실행 → 몇 초 안에 사이드바 "다른 컴퓨터"에
+   서로 나타납니다.
+
+**동작 방식:** 서버가 UDP 7778로 존재를 알리고(자동 발견), 원격 요청은
+공유 키가 일치할 때만 허용됩니다. 키는 서버끼리만 주고받고 브라우저에는
+내려가지 않습니다. `config.json`이 없으면 서버는 예전처럼 127.0.0.1
+전용으로 떠서 외부 접근이 불가능합니다.
+
+**원격 프롬프트:** 원격 세션 상세의 채팅창에 입력하면 그쪽 PC에서
+`claude -p --resume`으로 해당 세션에 이어서 실행되고 결과가 스트리밍으로
+돌아옵니다 (Ctrl+Enter 전송).
+
 ## 테스트
 
 ```

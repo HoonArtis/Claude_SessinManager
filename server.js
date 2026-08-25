@@ -3,6 +3,8 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const dgram = require('node:dgram');
+const crypto = require('node:crypto');
 const { spawn, spawnSync } = require('node:child_process');
 const { scanSessions } = require('./lib/scan-sessions');
 const { getKeybindings, setKeybinding, unsetKeybinding } = require('./lib/wt-keybindings');
@@ -13,7 +15,63 @@ const { buildHandoffMd } = require('./lib/handoff');
 const SAFE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
 
 const PORT = 7777;
+const DISCOVERY_PORT = 7778;
 const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
+
+// ---- 원격(로컬망) 설정 — config.json (git 미추적) ----
+// { "remote": { "enabled": true, "key": "공유 비밀키", "name": "표시 이름" } }
+const CONFIG = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+})();
+const REMOTE = CONFIG.remote || {};
+const REMOTE_ON = REMOTE.enabled === true && typeof REMOTE.key === 'string' && REMOTE.key.length >= 8;
+const MY_NAME = REMOTE.name || os.hostname();
+const INSTANCE_ID = crypto.randomUUID();
+
+function keyMatches(given) {
+  if (typeof given !== 'string' || !REMOTE.key) return false;
+  const a = Buffer.from(given), b = Buffer.from(REMOTE.key);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+function isLoopback(req) {
+  const ip = req.socket.remoteAddress || '';
+  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+}
+
+// ---- 로컬망 자동 발견: UDP 브로드캐스트 비콘 ----
+const peers = new Map(); // host -> { name, port, lastSeen }
+if (REMOTE_ON) {
+  const udp = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  udp.on('error', () => {});
+  udp.on('message', (msg, rinfo) => {
+    try {
+      const b = JSON.parse(msg.toString('utf8'));
+      if (b.t !== 'csm' || b.id === INSTANCE_ID) return;
+      peers.set(rinfo.address, { name: String(b.name || rinfo.address).slice(0, 60), port: b.port === PORT ? PORT : PORT, lastSeen: Date.now() });
+    } catch { /* 잘못된 패킷 무시 */ }
+  });
+  udp.bind(DISCOVERY_PORT, () => {
+    try { udp.setBroadcast(true); } catch {}
+    const beacon = () => {
+      const payload = Buffer.from(JSON.stringify({ t: 'csm', id: INSTANCE_ID, name: MY_NAME, port: PORT }));
+      try { udp.send(payload, DISCOVERY_PORT, '255.255.255.255'); } catch {}
+    };
+    beacon();
+    setInterval(beacon, 5000).unref();
+  });
+}
+
+function freshPeers() {
+  const now = Date.now();
+  return [...peers.entries()]
+    .filter(([, p]) => now - p.lastSeen < 20000)
+    .map(([host, p]) => ({ host, name: p.name }));
+}
 const SESSION_ID_RE = /^[0-9a-fA-F-]{8,64}$/;
 const cache = new Map();
 
@@ -139,6 +197,106 @@ function scheduleShutdown(ms) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    // 외부(로컬망)에서 온 요청은 공유 비밀키가 맞아야만 통과
+    if (!isLoopback(req)) {
+      if (!REMOTE_ON || !keyMatches(req.headers['x-csm-key'])) {
+        sendJson(res, 403, { error: '인증 실패: 공유 키가 없거나 일치하지 않습니다.' });
+        return;
+      }
+    }
+    if (req.method === 'GET' && req.url === '/api/peers') {
+      sendJson(res, 200, { enabled: REMOTE_ON, name: MY_NAME, peers: REMOTE_ON ? freshPeers() : [] });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/remote') {
+      // 브라우저 → 내 서버 → 상대 서버 프록시 (키는 서버끼리만 주고받는다)
+      let body;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch {
+        sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' });
+        return;
+      }
+      const { host, apiPath } = body || {};
+      const ALLOWED = ['/api/sessions', '/api/conversation', '/api/version', '/api/resume', '/api/prompt'];
+      if (!REMOTE_ON) {
+        sendJson(res, 400, { error: '원격 기능이 꺼져 있습니다 (config.json 확인).' });
+        return;
+      }
+      if (!peers.has(host)) {
+        sendJson(res, 400, { error: '발견된 컴퓨터가 아닙니다: ' + host });
+        return;
+      }
+      if (!ALLOWED.some((p) => String(apiPath || '').split('?')[0] === p)) {
+        sendJson(res, 400, { error: '허용되지 않은 원격 경로입니다.' });
+        return;
+      }
+      const payload = body.body === undefined ? null : Buffer.from(JSON.stringify(body.body));
+      const fwd = http.request({
+        host, port: PORT, path: apiPath, method: payload ? 'POST' : 'GET', timeout: 15000,
+        headers: { 'x-csm-key': REMOTE.key, 'Content-Type': 'application/json', ...(payload ? { 'Content-Length': payload.length } : {}) },
+      }, (r) => {
+        res.writeHead(r.statusCode || 502, { 'Content-Type': r.headers['content-type'] || 'application/json; charset=utf-8' });
+        r.pipe(res); // 스트리밍 응답(/api/prompt)도 그대로 흘려보낸다
+      });
+      fwd.on('timeout', () => fwd.destroy(new Error('timeout')));
+      fwd.on('error', (err) => {
+        if (!res.headersSent) sendJson(res, 502, { error: '상대 서버 연결 실패: ' + err.message });
+        else res.end('\n[연결 끊김: ' + err.message + ']');
+      });
+      if (payload) fwd.write(payload);
+      fwd.end();
+      // 프롬프트는 오래 걸릴 수 있으므로 프록시 요청의 타임아웃을 늘린다
+      if (String(apiPath).startsWith('/api/prompt')) fwd.setTimeout(15 * 60 * 1000);
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/prompt') {
+      // 세션에 프롬프트를 이어서 실행하고(claude -p --resume) 출력을 스트리밍으로 돌려준다.
+      // 프롬프트는 stdin으로 전달 — 셸 인젝션 원천 차단.
+      let body;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch {
+        sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' });
+        return;
+      }
+      const { projectDir, sessionId, prompt } = body || {};
+      if (!SAFE_NAME_RE.test(String(projectDir || '')) || !SESSION_ID_RE.test(String(sessionId || '')) ||
+          typeof prompt !== 'string' || !prompt.trim() || prompt.length > 20000) {
+        sendJson(res, 400, { error: '요청이 올바르지 않습니다.' });
+        return;
+      }
+      const src = path.join(PROJECTS_DIR, projectDir, sessionId + '.jsonl');
+      if (!fs.existsSync(src)) {
+        sendJson(res, 400, { error: '세션 파일을 찾을 수 없습니다.' });
+        return;
+      }
+      const meta = parseSession(fs.readFileSync(src, 'utf8'));
+      if (!meta.cwd || !fs.existsSync(meta.cwd)) {
+        sendJson(res, 400, { error: `작업 폴더가 존재하지 않습니다: ${meta.cwd || '(없음)'}` });
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' });
+      const child = spawn('cmd', ['/c', 'claude', '-p', '--resume', sessionId], {
+        cwd: meta.cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const killer = setTimeout(() => { try { child.kill(); } catch {} }, 10 * 60 * 1000);
+      child.stdin.write(prompt, 'utf8');
+      child.stdin.end();
+      child.stdout.on('data', (d) => res.write(d));
+      child.stderr.on('data', (d) => res.write(d));
+      child.on('close', (code) => {
+        clearTimeout(killer);
+        if (code !== 0) res.write(`\n[claude 종료 코드 ${code}]`);
+        res.end();
+      });
+      child.on('error', (err) => {
+        clearTimeout(killer);
+        res.end('\n[실행 실패: ' + err.message + ']');
+      });
+      req.on('close', () => { try { child.kill(); } catch {} });
+      return;
+    }
     if (req.method === 'GET' && req.url === '/api/alive') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
       res.write('data: ok\n\n');
@@ -508,6 +666,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Claude 세션 매니저: http://localhost:${PORT}`);
+// 원격 기능이 켜져 있으면 로컬망에도 연다 (외부 요청은 공유 키 인증 필수)
+server.listen(PORT, REMOTE_ON ? '0.0.0.0' : '127.0.0.1', () => {
+  console.log(`Claude 세션 매니저: http://localhost:${PORT}` + (REMOTE_ON ? ` (원격 켜짐: ${MY_NAME})` : ''));
 });
