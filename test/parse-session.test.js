@@ -47,6 +47,22 @@ test('tool_result만 있는 user 레코드와 사이드체인은 프롬프트로
   assert.strictEqual(s.empty, true);
 });
 
+test('origin이 없는 배열 content(스킬 주입 메시지)는 프롬프트로 취급하지 않는다', () => {
+  const text = [
+    line({ type: 'user', origin: { kind: 'human' }, message: { role: 'user', content: '진짜 프롬프트' }, timestamp: '2026-08-24T05:00:00.000Z' }),
+    line({ type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Base directory for this skill: ...' }] }, timestamp: '2026-08-24T05:01:00.000Z' }),
+  ].join('\n');
+  const s = parseSession(text);
+  assert.strictEqual(s.firstPrompt, '진짜 프롬프트');
+  assert.strictEqual(s.lastPrompt, '진짜 프롬프트');
+});
+
+test('origin 필드가 없는 구버전 문자열 content는 프롬프트로 인정한다', () => {
+  const text = line({ type: 'user', message: { role: 'user', content: '구버전 프롬프트' }, timestamp: '2026-08-24T05:00:00.000Z' });
+  const s = parseSession(text);
+  assert.strictEqual(s.firstPrompt, '구버전 프롬프트');
+});
+
 test('손상된 줄은 건너뛰고 계속 파싱한다', () => {
   const text = [
     '{"broken json',
