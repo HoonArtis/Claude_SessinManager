@@ -924,20 +924,26 @@ document.getElementById('kbBtn').onclick = () => { $kbOverlay.classList.add('ope
 document.getElementById('kbClose').onclick = closeKbModal;
 $kbOverlay.addEventListener('click', (e) => { if (e.target === $kbOverlay) closeKbModal(); });
 
-// 서버 생존 신호 — 이 페이지(탭)들이 모두 닫히면 서버가 스스로 꺼진다
-new EventSource('/api/alive');
+// 서버 생존 신호 — 이 페이지(탭)들이 모두 닫히면 서버가 스스로 꺼진다.
+// 연결이 다시 붙으면(서버 재시작 등) 버전을 다시 확인해서 낡은 화면이 남지 않게 한다.
+const $alive = new EventSource('/api/alive');
+$alive.addEventListener('open', () => checkVersion());
 
 // ---- 업데이트 확인·적용 ----
 // 켰을 때 새 버전이 있으면 모달로 물어본다. [1주일 동안 안 보기]는 localStorage에 저장되고,
 // 그동안은 우측 상단 [버전 업데이트하기] 버튼만 표시된다.
 const SNOOZE_KEY = 'csm-update-snooze-until';
 let updateModalShown = false;
+let pageCommit = null; // 이 페이지가 로드될 때의 서버 버전
 
 function checkVersion() {
   fetch('/api/version').then((r) => r.json()).then((v) => {
     const $v = document.getElementById('ver');
     const $btn = document.getElementById('verUpdateBtn');
     if (!v.commit) { $v.textContent = ''; return; }
+    // 서버가 다른 버전으로 재시작됐으면 이 페이지는 낡은 UI다 — 즉시 새로고침
+    if (pageCommit === null) pageCommit = v.commit;
+    else if (v.commit !== pageCommit) { location.reload(); return; }
     if (v.behind > 0) {
       // 깃허브에 새 커밋이 있음 — 받을지 물어본다
       $v.textContent = `${v.commit} · 업데이트 ${v.behind}건`;
@@ -967,6 +973,7 @@ function checkVersion() {
 }
 checkVersion();
 setTimeout(checkVersion, 8000); // 부팅 직후 백그라운드 fetch가 끝난 뒤 다시 확인
+setInterval(checkVersion, 300000); // 오래 켜둔 탭도 5분마다 상태 갱신
 
 async function doUpdate() {
   document.getElementById('updOverlay').style.display = 'none';
