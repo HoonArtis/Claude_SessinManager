@@ -6,6 +6,11 @@ const os = require('node:os');
 const { spawn, spawnSync } = require('node:child_process');
 const { scanSessions } = require('./lib/scan-sessions');
 const { getKeybindings, setKeybinding } = require('./lib/wt-keybindings');
+const { trashSessions } = require('./lib/trash-sessions');
+const { parseSession, extractUserPrompts } = require('./lib/parse-session');
+const { buildHandoffMd } = require('./lib/handoff');
+
+const SAFE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
 
 const PORT = 7777;
 const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
@@ -39,6 +44,19 @@ function wtSettingsPath() {
 
 function launchResume(cwd, sessionId) {
   const claudeCmd = `claude --resume ${sessionId}`;
+  const child = hasWt
+    ? spawn('wt', ['-d', cwd, 'cmd', '/k', claudeCmd], { detached: true, stdio: 'ignore' })
+    : spawn('cmd', ['/c', 'start', '"claude"', 'cmd', '/k', `cd /d "${cwd}" && ${claudeCmd}`], {
+        detached: true,
+        stdio: 'ignore',
+        shell: false,
+      });
+  child.unref();
+}
+
+// 새 터미널에서 fresh claude 세션을 열고 핸드오프 문서부터 읽게 한다
+function launchFreshClaude(cwd) {
+  const claudeCmd = 'claude "CLAUDE-HANDOFF.md 파일을 읽고 맥락을 파악한 뒤 다음 해야 할 일부터 이어서 작업해줘"';
   const child = hasWt
     ? spawn('wt', ['-d', cwd, 'cmd', '/k', claudeCmd], { detached: true, stdio: 'ignore' })
     : spawn('cmd', ['/c', 'start', '"claude"', 'cmd', '/k', `cd /d "${cwd}" && ${claudeCmd}`], {
@@ -92,7 +110,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const { id, keys } = body || {};
-      if (!id || !keys || !/^[a-z0-9+\-=]+$/i.test(keys)) {
+      if (!id || !keys || !/^[a-z0-9+,\-=]+$/i.test(keys)) {
         sendJson(res, 400, { error: '단축키 형식이 올바르지 않습니다.' });
         return;
       }
@@ -113,6 +131,63 @@ const server = http.createServer(async (req, res) => {
       fs.writeFileSync(settingsPath + '.csm-backup', original);
       fs.writeFileSync(settingsPath, updated);
       sendJson(res, 200, { ok: true, shortcuts: getKeybindings(updated) });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/speedup') {
+      let body;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch {
+        sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' });
+        return;
+      }
+      const { projectDir, sessionId } = body || {};
+      if (!SAFE_NAME_RE.test(String(projectDir || '')) || !SAFE_NAME_RE.test(String(sessionId || '')) ||
+          ['.', '..'].includes(projectDir) || ['.', '..'].includes(sessionId)) {
+        sendJson(res, 400, { error: '세션 정보가 올바르지 않습니다.' });
+        return;
+      }
+      const src = path.join(PROJECTS_DIR, projectDir, sessionId + '.jsonl');
+      if (!fs.existsSync(src)) {
+        sendJson(res, 400, { error: '세션 파일을 찾을 수 없습니다.' });
+        return;
+      }
+      const text = fs.readFileSync(src, 'utf8');
+      const meta = parseSession(text);
+      if (!validCwd(res, meta.cwd)) return;
+      // 1) 원본 세션을 백업 폴더 한곳에 모아둔다 (원본도 그대로 남음)
+      const backupDir = path.join(PROJECTS_DIR, '.csm-session-backups', projectDir);
+      fs.mkdirSync(backupDir, { recursive: true });
+      const backupPath = path.join(backupDir, sessionId + '.jsonl');
+      fs.copyFileSync(src, backupPath);
+      // 2) 작업 폴더에 핸드오프 문서 생성
+      const handoffPath = path.join(meta.cwd, 'CLAUDE-HANDOFF.md');
+      const md = buildHandoffMd({
+        ...meta,
+        sessionId,
+        prompts: extractUserPrompts(text, 30),
+        backupPath,
+      });
+      fs.writeFileSync(handoffPath, md, 'utf8');
+      // 3) 새 터미널에서 fresh 세션 시작
+      launchFreshClaude(meta.cwd);
+      sendJson(res, 200, { ok: true, handoffPath, backupPath });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/trash-sessions') {
+      let body;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch {
+        sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' });
+        return;
+      }
+      const items = Array.isArray(body && body.items) ? body.items : [];
+      if (!items.length) {
+        sendJson(res, 400, { error: '삭제할 세션이 없습니다.' });
+        return;
+      }
+      sendJson(res, 200, trashSessions(PROJECTS_DIR, items));
       return;
     }
     if (req.method === 'POST' && (req.url === '/api/resume' || req.url === '/api/open-folder')) {

@@ -1,64 +1,141 @@
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Claude 세션 매니저</title>
 <style>
-  :root { --bg: #f6f7f9; --panel: #fff; --border: #e2e5ea; --text: #1c2128; --muted: #6b7280; --accent: #c96442; }
+  :root { --bg: #f6f7f9; --panel: #fff; --border: #e2e5ea; --text: #1c2128; --muted: #5c6470; --accent: #c96442; --accent-soft: #f7e8e2; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
-  header { padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; gap: 16px; align-items: center; }
-  header h1 { font-size: 16px; margin: 0; }
-  #search { flex: 1; max-width: 480px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; }
-  header label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  ::selection { background: var(--accent-soft); color: var(--text); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-track { background: transparent; }
+  body { margin: 0; font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+  .icon { width: 14px; height: 14px; vertical-align: -2px; flex: none; }
+  header { padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: -0.01em; }
+  #search { flex: 1; min-width: 160px; max-width: 480px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg); caret-color: var(--accent); }
+  #search:focus { outline: 2px solid var(--accent); outline-offset: 0; background: var(--panel); }
+  header label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; min-height: 44px; cursor: pointer; }
+  header input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
+  #kbBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; color: var(--text); cursor: pointer; }
+  #kbBtn:hover { border-color: var(--accent); color: var(--accent); }
   main { flex: 1; display: flex; min-height: 0; }
-  #list { flex: 1; overflow-y: auto; padding: 12px; }
-  .row { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; cursor: pointer; }
+  #list { flex: 1; overflow-y: auto; padding: 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; align-content: start; }
+  .row { position: relative; text-align: left; font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; cursor: pointer; display: block; min-height: 72px; }
   .row:hover { border-color: var(--accent); }
   .row.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .row .title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
-  .row .meta { font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+  .row .title { font-weight: 600; font-size: 14px; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .meta { font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .row .meta span { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+  .row .meta .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .row .check { display: none; position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 6px; background: var(--panel); align-items: center; justify-content: center; color: #fff; }
+  body.delete-mode .row .check { display: flex; }
+  body.delete-mode .row.checked { border-color: #c0392b; box-shadow: 0 0 0 1px #c0392b; }
+  body.delete-mode .row.checked .check { background: #c0392b; border-color: #c0392b; }
+  #empty-msg { grid-column: 1 / -1; }
+  #delBar { display: none; position: sticky; bottom: 0; grid-column: 1 / -1; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; box-shadow: 0 -4px 16px rgba(28,33,40,.08); align-items: center; gap: 12px; }
+  body.delete-mode #delBar { display: flex; }
+  #delBar .count { flex: 1; font-size: 13px; }
+  #delBar button { min-height: 40px; padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  #delConfirmBtn { background: #c0392b; color: #fff; border: 0; }
+  #delConfirmBtn:disabled { opacity: .5; cursor: default; }
+  #delCancelBtn { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+  #delBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; color: var(--text); cursor: pointer; }
+  #delBtn:hover, body.delete-mode #delBtn { border-color: #c0392b; color: #c0392b; }
   #detail { width: 40%; min-width: 320px; max-width: 560px; background: var(--panel); border-left: 1px solid var(--border); padding: 20px; overflow-y: auto; display: none; }
   #detail.open { display: block; }
+  #detail .detail-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
   #detail h2 { font-size: 15px; margin: 0 0 12px; }
-  #detail dl { font-size: 13px; }
+  #detailClose { display: none; flex: none; width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--muted); cursor: pointer; align-items: center; justify-content: center; }
+  #detail dl { font-size: 13px; margin: 0; }
   #detail dt { color: var(--muted); margin-top: 10px; }
   #detail dd { margin: 2px 0 0; word-break: break-all; white-space: pre-wrap; }
   .btn-row { display: flex; gap: 8px; margin-top: 16px; }
-  .btn-row button { flex: 1; padding: 10px; border: 0; border-radius: 8px; font-size: 14px; cursor: pointer; }
+  .btn-row button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 10px; border: 0; border-radius: 8px; font-size: 14px; cursor: pointer; }
   #resumeBtn { background: var(--accent); color: #fff; }
+  #resumeBtn:hover { background: #b55536; }
   #openBtn { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+  #openBtn:hover { border-color: var(--accent); color: var(--accent); }
   .btn-row button:disabled { opacity: .5; cursor: default; }
   #status { margin-top: 8px; font-size: 13px; color: var(--muted); min-height: 18px; }
+  #speedupBtn { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
+  #speedupBtn:hover { background: var(--accent); color: #fff; }
+  .speedup-hint { font-size: 12px; color: var(--accent); margin: 8px 0 0; }
+  .heavy-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 5px; padding: 2px 6px; margin-right: 6px; vertical-align: 1px; }
+  .heavy-badge .icon { width: 11px; height: 11px; }
   #empty-msg { color: var(--muted); text-align: center; margin-top: 40px; }
-  #kbBtn { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; cursor: pointer; }
-  #kbBtn:hover { border-color: var(--accent); }
-  #kbOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 10; }
+  #kbOverlay { display: none; position: fixed; inset: 0; background: rgba(28,33,40,.4); z-index: 10; }
   #kbOverlay.open { display: flex; align-items: center; justify-content: center; }
-  #kbModal { background: var(--panel); border-radius: 12px; padding: 24px; width: 520px; max-height: 80vh; overflow-y: auto; }
+  #kbModal { background: var(--panel); border-radius: 12px; padding: 24px; width: 760px; max-width: calc(100vw - 24px); max-height: 85dvh; overflow-y: auto; box-shadow: 0 12px 32px rgba(28,33,40,.18); }
+  #kbList { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
+  .kb-group { grid-column: 1 / -1; }
+  @media (max-width: 640px) { #kbList { grid-template-columns: 1fr; } }
   #kbModal h2 { font-size: 15px; margin: 0 0 4px; }
   #kbModal .hint { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
-  .kb-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .kb-group { font-size: 12px; color: var(--muted); text-transform: none; margin: 16px 0 4px; font-weight: 600; }
+  .kb-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
   .kb-row .kb-label { flex: 1; }
-  .kb-key { min-width: 150px; text-align: center; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); font-family: Consolas, monospace; font-size: 12px; cursor: pointer; }
+  .kb-key { min-width: 150px; min-height: 40px; text-align: center; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-family: Consolas, monospace; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
+  .kb-key:hover { border-color: var(--accent); }
   .kb-key.listening { border-color: var(--accent); color: var(--accent); }
   .kb-key.changed { border-color: var(--accent); }
   #kbStatus { margin-top: 12px; font-size: 13px; color: var(--muted); min-height: 18px; }
-  #kbClose { margin-top: 12px; width: 100%; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); cursor: pointer; }
+  #kbClose { margin-top: 12px; width: 100%; min-height: 44px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; cursor: pointer; }
+  #kbClose:hover { border-color: var(--accent); color: var(--accent); }
+  @media (max-width: 768px) {
+    header { padding: 10px 12px; gap: 8px; }
+    #search { order: 3; flex-basis: 100%; max-width: none; }
+    #list { padding: 8px; }
+    .row { padding: 14px; }
+    #detail { position: fixed; inset: 0; width: auto; min-width: 0; max-width: none; border-left: 0; z-index: 5; padding: 16px; }
+    #detailClose { display: flex; }
+  }
 </style>
 <header>
   <h1>Claude 세션 매니저</h1>
-  <input id="search" type="search" placeholder="제목·프롬프트 검색...">
+  <input id="search" type="search" placeholder="제목·프롬프트 검색..." aria-label="세션 제목과 프롬프트 검색">
   <label><input id="showEmpty" type="checkbox"> 빈 세션 표시</label>
-  <button id="kbBtn">⌨ 터미널 단축키</button>
+  <button id="kbBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></svg> 터미널 단축키</button>
+  <button id="delBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> 삭제</button>
 </header>
 <main>
-  <div id="list"></div>
-  <aside id="detail"></aside>
+  <div id="list" role="listbox" aria-label="세션 목록"></div>
+  <aside id="detail" aria-label="세션 상세"></aside>
 </main>
+<div id="delOverlay" style="display:none; position:fixed; inset:0; background:rgba(28,33,40,.4); z-index:11; align-items:center; justify-content:center;">
+  <div role="alertdialog" aria-modal="true" aria-labelledby="delTitle" style="background:var(--panel); border-radius:12px; padding:24px; width:400px; max-width:calc(100vw - 24px); box-shadow:0 12px 32px rgba(28,33,40,.18);">
+    <h2 id="delTitle" style="font-size:15px; margin:0 0 8px;">정말 삭제할까요?</h2>
+    <p id="delDesc" style="font-size:13px; color:var(--muted); margin:0 0 16px;"></p>
+    <div style="display:flex; gap:8px;">
+      <button id="delYes" style="flex:1; min-height:44px; background:#c0392b; color:#fff; border:0; border-radius:8px; font-size:14px; cursor:pointer;">삭제</button>
+      <button id="delNo" style="flex:1; min-height:44px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer;">취소</button>
+    </div>
+  </div>
+</div>
+<div id="speedOverlay" style="display:none; position:fixed; inset:0; background:rgba(28,33,40,.4); z-index:11; align-items:center; justify-content:center;">
+  <div role="alertdialog" aria-modal="true" aria-labelledby="speedTitle" style="background:var(--panel); border-radius:12px; padding:24px; width:440px; max-width:calc(100vw - 24px); box-shadow:0 12px 32px rgba(28,33,40,.18);">
+    <h2 id="speedTitle" style="font-size:15px; margin:0 0 8px;">세션을 초기화할까요?</h2>
+    <div style="font-size:13px; color:var(--muted); margin:0 0 16px; line-height:1.6;">
+      <p style="margin:0 0 8px;">컨텍스트가 무거워진 세션을 빠른 새 세션으로 이어갑니다:</p>
+      <ol style="margin:0 0 8px; padding-left:18px;">
+        <li>요청 이력과 다음 할 일을 <b>CLAUDE-HANDOFF.md</b>로 작업 폴더에 저장</li>
+        <li>기존 세션을 백업 폴더(<b>.csm-session-backups</b>)에 보관</li>
+        <li>새 터미널에서 fresh Claude 세션이 핸드오프 문서를 읽고 시작</li>
+      </ol>
+      <p style="margin:0;">기존 세션 기록은 삭제되지 않습니다.</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button id="speedYes" style="flex:1; min-height:44px; background:var(--accent); color:#fff; border:0; border-radius:8px; font-size:14px; cursor:pointer;">초기화 &amp; 재시작</button>
+      <button id="speedNo" style="flex:1; min-height:44px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer;">취소</button>
+    </div>
+  </div>
+</div>
 <div id="kbOverlay">
-  <div id="kbModal">
-    <h2>Windows Terminal 단축키</h2>
+  <div id="kbModal" role="dialog" aria-modal="true" aria-labelledby="kbTitle">
+    <h2 id="kbTitle">Windows Terminal 단축키</h2>
     <div class="hint">키 칸을 클릭한 뒤 원하는 키 조합을 누르면 settings.json에 바로 저장됩니다. (저장 전 자동 백업: settings.json.csm-backup)</div>
     <div id="kbList"></div>
-    <div id="kbStatus"></div>
+    <div id="kbStatus" role="status" aria-live="polite"></div>
     <button id="kbClose">닫기</button>
   </div>
 </div>
@@ -70,6 +147,21 @@ const $list = document.getElementById('list');
 const $detail = document.getElementById('detail');
 const $search = document.getElementById('search');
 const $showEmpty = document.getElementById('showEmpty');
+
+const ICONS = {
+  folder: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>',
+  clock: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>',
+  chat: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H4l2.5-3A8 8 0 1 1 21 12z"/></svg>',
+  play: '<svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5-11-6.5z"/></svg>',
+  open: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H7l-2 8H3V7z"/><path d="M7 10h14l-2 8H5l2-8z"/></svg>',
+  close: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  bolt: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>',
+};
+
+// 메시지가 많은 세션은 컨텍스트 오염(자동 압축, 응답 지연) 가능성이 높다
+function heavySession(s) {
+  return s.messageCount >= 300;
+}
 
 function relTime(iso) {
   if (!iso) return '-';
@@ -102,19 +194,30 @@ function visible() {
 
 function renderList() {
   const items = visible();
+  const delBar = `
+    <div id="delBar">
+      <span class="count">${checked.size}개 선택됨 — 삭제된 세션은 휴지통(.csm-trash)으로 이동합니다</span>
+      <button id="delCancelBtn">취소</button>
+      <button id="delConfirmBtn"${checked.size ? '' : ' disabled'}>선택 삭제</button>
+    </div>`;
   if (!items.length) {
-    $list.innerHTML = '<p id="empty-msg">표시할 세션이 없습니다.</p>';
+    $list.innerHTML = '<p id="empty-msg">표시할 세션이 없습니다.</p>' + (deleteMode ? delBar : '');
     return;
   }
   $list.innerHTML = items.map((s) => `
-    <div class="row${selected === s.sessionId ? ' active' : ''}" data-id="${esc(s.sessionId)}">
-      <div class="title">${esc(s.title || '(제목 없음)')}</div>
+    <button class="row${selected === s.sessionId ? ' active' : ''}${checked.has(s.sessionId) ? ' checked' : ''}" data-id="${esc(s.sessionId)}" role="option" aria-selected="${selected === s.sessionId}">
+      <span class="check" aria-hidden="true">${checked.has(s.sessionId) ? '✓' : ''}</span>
+      <div class="title">${heavySession(s) ? '<span class="heavy-badge">' + ICONS.bolt + ' 초기화 권장</span>' : ''}${esc(s.title || '(제목 없음)')}</div>
       <div class="meta">
-        <span>📁 ${esc(s.cwd || '(경로 없음)')}</span>
-        <span>🕒 ${relTime(s.lastTimestamp)}</span>
-        <span>💬 ${s.messageCount}</span>
+        <span class="path">${ICONS.folder} ${esc(s.cwd || '(경로 없음)')}</span>
+        <span>${ICONS.clock} ${relTime(s.lastTimestamp)}</span>
+        <span>${ICONS.chat} ${s.messageCount}</span>
       </div>
-    </div>`).join('');
+    </button>`).join('') + (deleteMode ? delBar : '');
+  if (deleteMode) {
+    document.getElementById('delCancelBtn').onclick = exitDeleteMode;
+    document.getElementById('delConfirmBtn').onclick = openDeleteConfirm;
+  }
 }
 
 function renderDetail() {
@@ -124,7 +227,10 @@ function renderDetail() {
   const durMin = Math.round(durMs / 60000);
   $detail.classList.add('open');
   $detail.innerHTML = `
-    <h2>${esc(s.title || '(제목 없음)')}</h2>
+    <div class="detail-top">
+      <h2>${esc(s.title || '(제목 없음)')}</h2>
+      <button id="detailClose" aria-label="상세 닫기">${ICONS.close}</button>
+    </div>
     <dl>
       <dt>작업 폴더</dt><dd>${esc(s.cwd || '-')}</dd>
       <dt>마지막 활동</dt><dd>${relTime(s.lastTimestamp)} (${esc(s.lastTimestamp || '-')})</dd>
@@ -135,12 +241,18 @@ function renderDetail() {
       <dt>세션 ID</dt><dd>${esc(s.sessionId)}</dd>
     </dl>
     <div class="btn-row">
-      <button id="resumeBtn"${s.cwd ? '' : ' disabled'}>▶ 이어서 작업</button>
-      <button id="openBtn"${s.cwd ? '' : ' disabled'}>📂 폴더 열기</button>
+      <button id="resumeBtn"${s.cwd ? '' : ' disabled'}>${ICONS.play} 이어서 작업</button>
+      <button id="openBtn"${s.cwd ? '' : ' disabled'}>${ICONS.open} 폴더 열기</button>
     </div>
-    <div id="status"></div>`;
+    <div class="btn-row">
+      <button id="speedupBtn"${s.cwd ? '' : ' disabled'}>${ICONS.bolt} 세션 초기화 (속도업)</button>
+    </div>
+    ${heavySession(s) ? '<p class="speedup-hint">이 세션은 메시지가 많아 컨텍스트 오염 가능성이 있습니다. 초기화를 권장합니다.</p>' : ''}
+    <div id="status" role="status" aria-live="polite"></div>`;
   document.getElementById('resumeBtn').onclick = () => callApi('/api/resume', s, '터미널을 열었습니다.');
   document.getElementById('openBtn').onclick = () => callApi('/api/open-folder', s, '탐색기를 열었습니다.');
+  document.getElementById('speedupBtn').onclick = () => openSpeedupConfirm(s);
+  document.getElementById('detailClose').onclick = () => { selected = null; renderList(); renderDetail(); };
 }
 
 async function callApi(url, s, okMsg) {
@@ -169,10 +281,105 @@ async function load() {
 $list.addEventListener('click', (e) => {
   const row = e.target.closest('.row');
   if (!row) return;
+  if (deleteMode) {
+    const id = row.dataset.id;
+    if (checked.has(id)) checked.delete(id); else checked.add(id);
+    renderList();
+    return;
+  }
   selected = row.dataset.id;
   renderList();
   renderDetail();
 });
+
+// ---- 세션 삭제 (휴지통 이동) ----
+let deleteMode = false;
+const checked = new Set();
+const $delOverlay = document.getElementById('delOverlay');
+const $delBtn = document.getElementById('delBtn');
+
+function exitDeleteMode() {
+  deleteMode = false;
+  checked.clear();
+  document.body.classList.remove('delete-mode');
+  $delBtn.setAttribute('aria-pressed', 'false');
+  renderList();
+}
+
+$delBtn.onclick = () => {
+  if (deleteMode) { exitDeleteMode(); return; }
+  deleteMode = true;
+  selected = null;
+  renderDetail();
+  document.body.classList.add('delete-mode');
+  $delBtn.setAttribute('aria-pressed', 'true');
+  renderList();
+};
+
+function openDeleteConfirm() {
+  if (!checked.size) return;
+  document.getElementById('delDesc').textContent =
+    `세션 ${checked.size}개를 삭제합니다. 파일은 완전히 지워지지 않고 휴지통(.claude\\projects\\.csm-trash)으로 이동하며, 필요하면 되돌릴 수 있습니다.`;
+  $delOverlay.style.display = 'flex';
+  document.getElementById('delNo').focus();
+}
+
+document.getElementById('delNo').onclick = () => { $delOverlay.style.display = 'none'; };
+document.getElementById('delYes').onclick = async () => {
+  const items = sessions
+    .filter((s) => checked.has(s.sessionId))
+    .map((s) => ({ projectDir: s.projectDir, sessionId: s.sessionId }));
+  $delOverlay.style.display = 'none';
+  try {
+    const res = await fetch('/api/trash-sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    exitDeleteMode();
+    await load();
+  } catch (err) {
+    alertInline('삭제 실패: ' + err.message);
+  }
+};
+
+function alertInline(msg) {
+  const bar = document.getElementById('delBar');
+  if (bar) bar.querySelector('.count').textContent = msg;
+}
+
+// ---- 세션 초기화 (속도업) ----
+const $speedOverlay = document.getElementById('speedOverlay');
+let speedupTarget = null;
+
+function openSpeedupConfirm(s) {
+  speedupTarget = s;
+  $speedOverlay.style.display = 'flex';
+  document.getElementById('speedNo').focus();
+}
+
+document.getElementById('speedNo').onclick = () => { $speedOverlay.style.display = 'none'; };
+document.getElementById('speedYes').onclick = async () => {
+  const s = speedupTarget;
+  $speedOverlay.style.display = 'none';
+  if (!s) return;
+  const $status = document.getElementById('status');
+  if ($status) $status.textContent = '핸드오프 문서 생성 중...';
+  try {
+    const res = await fetch('/api/speedup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectDir: s.projectDir, sessionId: s.sessionId }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    if ($status) $status.textContent = '새 세션을 시작했습니다. 핸드오프: ' + body.handoffPath;
+  } catch (err) {
+    if ($status) $status.textContent = '실패: ' + err.message;
+  }
+};
 $search.addEventListener('input', renderList);
 $showEmpty.addEventListener('change', renderList);
 
@@ -190,13 +397,18 @@ function prettyKeys(keys) {
 }
 
 function renderShortcuts() {
-  $kbList.innerHTML = shortcuts.map((s) => `
+  let lastGroup = null;
+  $kbList.innerHTML = shortcuts.map((s) => {
+    const header = s.group !== lastGroup ? `<h3 class="kb-group">${esc(s.group)}</h3>` : '';
+    lastGroup = s.group;
+    return `${header}
     <div class="kb-row">
       <span class="kb-label">${esc(s.label)}</span>
-      <span class="kb-key${listeningId === s.id ? ' listening' : ''}${s.currentKeys !== s.defaultKeys ? ' changed' : ''}" data-id="${esc(s.id)}">
+      <button class="kb-key${listeningId === s.id ? ' listening' : ''}${s.currentKeys !== s.defaultKeys ? ' changed' : ''}" data-id="${esc(s.id)}" aria-label="${esc(s.label)} 단축키 변경, 현재 ${esc(prettyKeys(s.currentKeys))}">
         ${listeningId === s.id ? '키를 누르세요...' : esc(prettyKeys(s.currentKeys))}
-      </span>
-    </div>`).join('');
+      </button>
+    </div>`;
+  }).join('');
 }
 
 async function loadShortcuts() {
@@ -221,7 +433,8 @@ function eventToWtKeys(e) {
   let key = e.key.toLowerCase();
   if (['control', 'alt', 'shift', 'meta'].includes(key)) return null; // 수정키만 누른 상태
   key = map[key] || key;
-  if (!mods.length) return null; // 수정키 없는 단일 키는 오입력 방지를 위해 무시
+  // 수정키 없는 단일 키는 오입력 방지를 위해 무시 (F1~F24 기능키는 예외)
+  if (!mods.length && !/^f\d{1,2}$/.test(key)) return null;
   return mods.concat(key).join('+');
 }
 
@@ -251,10 +464,18 @@ $kbList.addEventListener('click', (e) => {
   renderShortcuts();
 });
 
+function closeKbModal() {
+  listeningId = null;
+  $kbOverlay.classList.remove('open');
+  document.getElementById('kbBtn').focus();
+}
+
 document.addEventListener('keydown', (e) => {
+  if ($kbOverlay.classList.contains('open') && e.key === 'Escape' && !listeningId) { closeKbModal(); return; }
   if (!listeningId) return;
   e.preventDefault();
   if (e.key === 'Escape') { listeningId = null; $kbStatus.textContent = ''; renderShortcuts(); return; }
+  if (e.key === 'Enter' || e.key === ' ') return; // 버튼 재활성화 키는 조합으로 오인하지 않음
   const keys = eventToWtKeys(e);
   if (!keys) return;
   const id = listeningId;
@@ -263,8 +484,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.getElementById('kbBtn').onclick = () => { $kbOverlay.classList.add('open'); loadShortcuts(); };
-document.getElementById('kbClose').onclick = () => { listeningId = null; $kbOverlay.classList.remove('open'); };
-$kbOverlay.addEventListener('click', (e) => { if (e.target === $kbOverlay) { listeningId = null; $kbOverlay.classList.remove('open'); } });
+document.getElementById('kbClose').onclick = closeKbModal;
+$kbOverlay.addEventListener('click', (e) => { if (e.target === $kbOverlay) closeKbModal(); });
 
 load();
 </script>
