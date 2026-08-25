@@ -15,6 +15,14 @@
   header h1 { font-size: 16px; margin: 0; letter-spacing: -0.01em; }
   .ver { font-size: 11px; color: var(--muted); font-family: Consolas, monospace; }
   .ver.behind { color: var(--token); background: var(--token-soft); padding: 2px 8px; border-radius: 9px; font-weight: 600; }
+  #verUpdateBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--token); border-radius: 8px; background: var(--token-soft); font-size: 13px; color: var(--token); font-weight: 600; cursor: pointer; }
+  #verUpdateBtn:hover { background: var(--token); color: #fff; }
+  .title-edit { display: flex; gap: 6px; flex: 1; }
+  .title-edit input { flex: 1; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; font-size: 14px; background: var(--bg); color: var(--text); }
+  .title-edit button { min-height: 38px; padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
+  .title-edit .save { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #renameBtn { flex: none; width: 34px; height: 34px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  #renameBtn:hover { border-color: var(--accent); color: var(--accent); }
   #search { flex: 1; min-width: 160px; max-width: 480px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--bg); caret-color: var(--accent); }
   #search:focus { outline: 2px solid var(--accent); outline-offset: 0; background: var(--panel); }
   header label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; min-height: 44px; cursor: pointer; }
@@ -149,6 +157,7 @@
   <button id="kbBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></svg> 터미널 단축키</button>
   <button id="delBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> 삭제</button>
   <button id="backupBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 10v5M9.5 12.5 12 15l2.5-2.5"/></svg> 백업 폴더</button>
+  <button id="verUpdateBtn" hidden>버전 업데이트하기</button>
 </header>
 <div id="filterBar">
   <div class="chips" role="group" aria-label="기간 필터">
@@ -202,6 +211,17 @@
     </div>
   </div>
 </div>
+<div id="updOverlay" style="display:none; position:fixed; inset:0; background:rgba(28,33,40,.4); z-index:13; align-items:center; justify-content:center;">
+  <div role="alertdialog" aria-modal="true" aria-labelledby="updTitle" style="background:var(--panel); border-radius:12px; padding:24px; width:420px; max-width:calc(100vw - 24px); box-shadow:0 12px 32px rgba(28,33,40,.18);">
+    <h2 id="updTitle" style="font-size:15px; margin:0 0 8px;">업데이트가 있습니다</h2>
+    <p style="font-size:13px; color:var(--muted); margin:0 0 16px;">새 버전 <b id="updCount"></b>건이 깃허브에 올라와 있어요. 받으시겠습니까? 받으면 잠깐 재시작 후 자동으로 새로고침됩니다.</p>
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+      <button id="updNow" style="flex:1; min-height:44px; background:var(--accent); color:#fff; border:0; border-radius:8px; font-size:14px; cursor:pointer;">지금 업데이트</button>
+      <button id="updLater" style="flex:1; min-height:44px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer;">나중에</button>
+    </div>
+    <button id="updSnooze" style="width:100%; min-height:38px; background:none; color:var(--muted); border:0; font-size:12px; cursor:pointer; text-decoration:underline;">1주일 동안 안 보기</button>
+  </div>
+</div>
 <div id="kbWarnOverlay" style="display:none; position:fixed; inset:0; background:rgba(28,33,40,.4); z-index:12; align-items:center; justify-content:center;">
   <div role="alertdialog" aria-modal="true" aria-labelledby="kbWarnTitle" style="background:var(--panel); border-radius:12px; padding:24px; width:460px; max-width:calc(100vw - 24px); box-shadow:0 12px 32px rgba(28,33,40,.18);">
     <h2 id="kbWarnTitle" style="font-size:15px; margin:0 0 8px; color:#c0392b;">이 키는 주의가 필요합니다</h2>
@@ -240,6 +260,7 @@ const ICONS = {
   close: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   bolt: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>',
   token: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M8.5 9.5c0-1.4 1.5-2.2 3.5-2.2s3.5.8 3.5 2.2-1.5 2-3.5 2.3-3.5.9-3.5 2.2 1.5 2.2 3.5 2.2 3.5-.8 3.5-2.2"/></svg>',
+  pencil: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 20l1.5-4.5L16 5l3 3L8.5 18.5 4 20z"/><path d="M14 7l3 3"/></svg>',
 };
 
 // 메시지가 많은 세션은 컨텍스트 오염(자동 압축, 응답 지연) 가능성이 높다
@@ -396,6 +417,7 @@ function renderDetail() {
   $detail.innerHTML = `
     <div class="detail-top">
       <h2>${esc(s.title || '(제목 없음)')}</h2>
+      <button id="renameBtn" aria-label="세션 이름 변경" title="이름 변경">${ICONS.pencil}</button>
       <button id="detailClose" aria-label="상세 닫기">${ICONS.close}</button>
     </div>
     <dl>
@@ -440,6 +462,44 @@ function renderDetail() {
   document.getElementById('speedupBtn').onclick = () => openSpeedupConfirm(s);
   document.getElementById('convBtn').onclick = () => toggleConversation(s);
   document.getElementById('detailClose').onclick = () => { selected = null; renderList(); renderDetail(); };
+  document.getElementById('renameBtn').onclick = () => startRename(s);
+}
+
+// 세션 이름 변경 — 제목 자리를 입력창으로 바꾸고, 저장하면 사이드카에 기록된다 (빈칸 저장 = 원래 제목 복원)
+function startRename(s) {
+  const top = $detail.querySelector('.detail-top');
+  top.innerHTML = `
+    <div class="title-edit">
+      <input id="renameInput" maxlength="200" placeholder="비워두면 원래 제목으로 복원">
+      <button class="save" id="renameSave">저장</button>
+      <button id="renameCancel">취소</button>
+    </div>`;
+  const $input = document.getElementById('renameInput');
+  $input.value = s.title || '';
+  $input.focus();
+  $input.select();
+  const doSave = async () => {
+    try {
+      const res = await fetch('/api/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectDir: s.projectDir, sessionId: s.sessionId, title: $input.value }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error);
+      await load();
+    } catch (err) {
+      renderDetail();
+      const $status = document.getElementById('status');
+      if ($status) $status.textContent = '이름 변경 실패: ' + err.message;
+    }
+  };
+  document.getElementById('renameSave').onclick = doSave;
+  document.getElementById('renameCancel').onclick = () => renderDetail();
+  $input.onkeydown = (e) => {
+    if (e.key === 'Enter') doSave();
+    if (e.key === 'Escape') { e.stopPropagation(); renderDetail(); }
+  };
 }
 
 // 최근 대화: 내 메시지는 전문, Claude 응답은 "…"으로 접어서 보여준다
@@ -867,17 +927,69 @@ $kbOverlay.addEventListener('click', (e) => { if (e.target === $kbOverlay) close
 // 서버 생존 신호 — 이 페이지(탭)들이 모두 닫히면 서버가 스스로 꺼진다
 new EventSource('/api/alive');
 
-// 실행 중인 버전 표시 — 원격에 새 커밋이 있으면 배지로 알림 (받기는 바로가기 재실행이 담당)
-fetch('/api/version').then((r) => r.json()).then((v) => {
+// ---- 업데이트 확인·적용 ----
+// 켰을 때 새 버전이 있으면 모달로 물어본다. [1주일 동안 안 보기]는 localStorage에 저장되고,
+// 그동안은 우측 상단 [버전 업데이트하기] 버튼만 표시된다.
+const SNOOZE_KEY = 'csm-update-snooze-until';
+let updateModalShown = false;
+
+function checkVersion() {
+  fetch('/api/version').then((r) => r.json()).then((v) => {
+    const $v = document.getElementById('ver');
+    const $btn = document.getElementById('verUpdateBtn');
+    if (!v.commit) { $v.textContent = ''; return; }
+    if (v.behind > 0) {
+      $v.textContent = `${v.commit} · 업데이트 ${v.behind}건`;
+      $v.classList.add('behind');
+      const snoozedUntil = parseInt(localStorage.getItem(SNOOZE_KEY) || '0', 10);
+      if (Date.now() < snoozedUntil) {
+        $btn.hidden = false;
+      } else if (!updateModalShown) {
+        updateModalShown = true;
+        document.getElementById('updCount').textContent = v.behind;
+        document.getElementById('updOverlay').style.display = 'flex';
+        document.getElementById('updLater').focus();
+      }
+    } else {
+      $v.textContent = `${v.commit} · 최신`;
+      $v.classList.remove('behind');
+      $btn.hidden = true;
+    }
+  }).catch(() => { document.getElementById('ver').textContent = ''; });
+}
+checkVersion();
+setTimeout(checkVersion, 8000); // 부팅 직후 백그라운드 fetch가 끝난 뒤 다시 확인
+
+async function doUpdate() {
+  document.getElementById('updOverlay').style.display = 'none';
+  document.getElementById('verUpdateBtn').hidden = true;
   const $v = document.getElementById('ver');
-  if (!v.commit) { $v.textContent = ''; return; }
-  if (v.behind > 0) {
-    $v.textContent = `${v.commit} · 업데이트 ${v.behind}건 — 바로가기로 다시 실행하면 적용`;
-    $v.classList.add('behind');
-  } else {
-    $v.textContent = `${v.commit} · 최신`;
+  $v.classList.remove('behind');
+  $v.textContent = '업데이트 받는 중...';
+  try {
+    const res = await fetch('/api/update', { method: 'POST' });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    $v.textContent = '적용 중 — 곧 새로고침됩니다...';
+    // 서버가 재시작될 때까지 기다렸다가 새 버전 페이지로 리로드
+    setTimeout(function poll() {
+      fetch('/api/version').then(() => location.reload()).catch(() => setTimeout(poll, 700));
+    }, 2500);
+  } catch (err) {
+    $v.textContent = '업데이트 실패: ' + err.message;
   }
-}).catch(() => { document.getElementById('ver').textContent = ''; });
+}
+
+document.getElementById('verUpdateBtn').onclick = doUpdate;
+document.getElementById('updNow').onclick = doUpdate;
+document.getElementById('updLater').onclick = () => {
+  document.getElementById('updOverlay').style.display = 'none';
+};
+document.getElementById('updSnooze').onclick = () => {
+  localStorage.setItem(SNOOZE_KEY, String(Date.now() + 7 * 86400000));
+  document.getElementById('updOverlay').style.display = 'none';
+  document.getElementById('verUpdateBtn').hidden = false;
+};
 
 load();
 </script>

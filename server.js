@@ -17,6 +17,16 @@ const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 const SESSION_ID_RE = /^[0-9a-fA-F-]{8,64}$/;
 const cache = new Map();
 
+// 사용자가 바꾼 세션 이름 — 세션 파일(.jsonl)은 건드리지 않고 사이드카에 보관한다
+const TITLES_PATH = path.join(PROJECTS_DIR, '.csm-titles.json');
+function loadTitles() {
+  try {
+    return JSON.parse(fs.readFileSync(TITLES_PATH, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
 function sendJson(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(body));
@@ -32,6 +42,19 @@ function readBody(req) {
 }
 
 const hasWt = spawnSync('where', ['wt'], { windowsHide: true }).status === 0;
+
+// 부팅 시점의 커밋 = 지금 실행 중인 코드의 버전 (이후 pull로 HEAD가 움직여도 불변)
+const BOOT_COMMIT = (() => {
+  const r = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname, windowsHide: true, encoding: 'utf8' });
+  return r.status === 0 ? r.stdout.trim() : null;
+})();
+
+// 부팅 직후 백그라운드로 원격 확인만 해둔다 (받을지는 사용자가 결정)
+setTimeout(() => {
+  try {
+    spawn('git', ['fetch', '--quiet'], { cwd: __dirname, windowsHide: true, stdio: 'ignore' }).on('error', () => {});
+  } catch { /* git 없음/오프라인 — 무시 */ }
+}, 2000);
 
 const WT_SETTINGS_CANDIDATES = [
   path.join(process.env.LOCALAPPDATA || '', 'Packages', 'Microsoft.WindowsTerminal_8wekyb3d8bbwe', 'LocalState', 'settings.json'),
@@ -135,18 +158,47 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.method === 'GET' && req.url === '/api/version') {
-      // 실행 중인 버전과, 마지막 fetch 기준 원격에 밀린 커밋 수 (fetch는 launch.vbs의 git pull이 담당)
+      // "지금 실행 중인 코드"(부팅 시점 커밋) 기준으로 원격에 밀린 커밋 수를 계산한다.
+      // launch.vbs가 백그라운드 pull로 HEAD를 먼저 올려놔도 재실행 전까지는 업데이트로 표시된다.
       const opts = { cwd: __dirname, windowsHide: true, encoding: 'utf8' };
-      const head = spawnSync('git', ['rev-parse', '--short', 'HEAD'], opts);
-      const behind = spawnSync('git', ['rev-list', '--count', 'HEAD..origin/master'], opts);
+      const behind = BOOT_COMMIT
+        ? spawnSync('git', ['rev-list', '--count', `${BOOT_COMMIT}..origin/master`], opts)
+        : null;
       sendJson(res, 200, {
-        commit: head.status === 0 ? head.stdout.trim() : null,
-        behind: behind.status === 0 ? parseInt(behind.stdout.trim(), 10) || 0 : 0,
+        commit: BOOT_COMMIT,
+        behind: behind && behind.status === 0 ? parseInt(behind.stdout.trim(), 10) || 0 : 0,
       });
       return;
     }
     if (req.method === 'GET' && req.url === '/api/sessions') {
-      sendJson(res, 200, scanSessions(PROJECTS_DIR, cache));
+      const titles = loadTitles();
+      sendJson(res, 200, scanSessions(PROJECTS_DIR, cache).map((s) => {
+        const custom = titles[`${s.projectDir}/${s.sessionId}`];
+        return custom ? { ...s, title: custom } : s;
+      }));
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/rename') {
+      let body;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch {
+        sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' });
+        return;
+      }
+      const { projectDir, sessionId, title } = body || {};
+      if (!SAFE_NAME_RE.test(String(projectDir || '')) || !SAFE_NAME_RE.test(String(sessionId || '')) ||
+          ['.', '..'].includes(projectDir) || ['.', '..'].includes(sessionId)) {
+        sendJson(res, 400, { error: '세션 정보가 올바르지 않습니다.' });
+        return;
+      }
+      const titles = loadTitles();
+      const key = `${projectDir}/${sessionId}`;
+      const trimmed = String(title == null ? '' : title).trim().slice(0, 200);
+      if (trimmed) titles[key] = trimmed;
+      else delete titles[key]; // 빈 이름으로 저장하면 원래 제목으로 되돌린다
+      fs.writeFileSync(TITLES_PATH, JSON.stringify(titles, null, 2));
+      sendJson(res, 200, { ok: true, title: trimmed || null });
       return;
     }
     if (req.method === 'GET' && req.url === '/api/wt-keybindings') {
@@ -231,6 +283,24 @@ const server = http.createServer(async (req, res) => {
         backupPath: path.join(PROJECTS_DIR, '.csm-session-backups', projectDir, sessionId + '.jsonl'),
       });
       sendJson(res, 200, { md, handoffPath: meta.cwd ? path.join(meta.cwd, 'CLAUDE-HANDOFF.md') : null });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/update') {
+      // 새 버전 받기(git pull) 후 새 코드로 자동 재시작
+      const pull = spawnSync('git', ['pull', '--ff-only'], { cwd: __dirname, windowsHide: true, encoding: 'utf8' });
+      if (pull.status !== 0) {
+        sendJson(res, 500, { error: '업데이트 실패: ' + ((pull.stderr || pull.stdout || '알 수 없는 오류').trim()) });
+        return;
+      }
+      sendJson(res, 200, { ok: true });
+      // 포트가 비워진 1초 뒤 새 프로세스가 뜨도록 예약하고 종료
+      setTimeout(() => {
+        const child = spawn('cmd', ['/c', 'timeout /t 1 /nobreak >nul & node server.js'], {
+          cwd: __dirname, detached: true, stdio: 'ignore', windowsHide: true,
+        });
+        child.unref();
+        process.exit(0);
+      }, 300);
       return;
     }
     if (req.method === 'POST' && req.url === '/api/open-backups') {
