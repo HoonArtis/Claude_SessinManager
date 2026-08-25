@@ -110,6 +110,22 @@ function freshPeers() {
 const SESSION_ID_RE = /^[0-9a-fA-F-]{8,64}$/;
 const cache = new Map();
 
+// 원격 프롬프트 체인: claude -p --resume가 새 세션으로 분기하는 경우,
+// 원본 세션 ID -> 최신 분기 ID 를 기록해 대화가 한 줄기로 이어지게 한다
+const CHAINS_PATH = path.join(PROJECTS_DIR, '.csm-chains.json');
+function loadChains() {
+  try {
+    return JSON.parse(fs.readFileSync(CHAINS_PATH, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+function resolveChain(sessionId, projectDir) {
+  const latest = loadChains()[sessionId];
+  if (latest && fs.existsSync(path.join(PROJECTS_DIR, projectDir, latest + '.jsonl'))) return latest;
+  return sessionId;
+}
+
 // 사용자가 바꾼 세션 이름 — 세션 파일(.jsonl)은 건드리지 않고 사이드카에 보관한다
 const TITLES_PATH = path.join(PROJECTS_DIR, '.csm-titles.json');
 function loadTitles() {
@@ -339,7 +355,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const { host, apiPath } = body || {};
-      const ALLOWED = ['/api/sessions', '/api/conversation', '/api/version', '/api/resume', '/api/prompt'];
+      const ALLOWED = ['/api/sessions', '/api/conversation', '/api/conversation-full', '/api/version', '/api/resume', '/api/prompt'];
       if (!REMOTE_ON) {
         sendJson(res, 400, { error: '원격 기능이 꺼져 있습니다 (config.json 확인).' });
         return;
@@ -392,23 +408,51 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 400, { error: '세션 파일을 찾을 수 없습니다.' });
         return;
       }
-      const meta = parseSession(fs.readFileSync(src, 'utf8'));
+      // 이전 원격 대화가 분기됐다면 최신 체인에 이어붙인다 — 대화가 한 줄기로 계속되게
+      const effectiveId = resolveChain(sessionId, projectDir);
+      const effSrc = path.join(PROJECTS_DIR, projectDir, effectiveId + '.jsonl');
+      const meta = parseSession(fs.readFileSync(fs.existsSync(effSrc) ? effSrc : src, 'utf8'));
       if (!meta.cwd || !fs.existsSync(meta.cwd)) {
         sendJson(res, 400, { error: `작업 폴더가 존재하지 않습니다: ${meta.cwd || '(없음)'}` });
         return;
       }
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' });
-      const child = spawn('cmd', ['/c', 'claude', '-p', '--resume', sessionId], {
-        cwd: meta.cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+      // stream-json: assistant 메시지가 나오는 대로 스트리밍, 마지막 result에서 분기 ID를 체인에 기록
+      const child = spawn('cmd', ['/c', 'claude', '-p', '--resume', effectiveId, '--output-format', 'stream-json', '--verbose'], {
+        cwd: meta.cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: CLEAN_ENV,
       });
       const killer = setTimeout(() => { try { child.kill(); } catch {} }, 10 * 60 * 1000);
       child.stdin.write(prompt, 'utf8');
       child.stdin.end();
-      child.stdout.on('data', (d) => res.write(d));
-      child.stderr.on('data', (d) => res.write(d));
+      let outBuf = '';
+      let errBuf = '';
+      child.stdout.on('data', (d) => {
+        outBuf += d.toString('utf8');
+        let nl;
+        while ((nl = outBuf.indexOf('\n')) >= 0) {
+          const line = outBuf.slice(0, nl).trim();
+          outBuf = outBuf.slice(nl + 1);
+          if (!line) continue;
+          try {
+            const ev = JSON.parse(line);
+            if (ev.type === 'assistant' && ev.message && Array.isArray(ev.message.content)) {
+              const text = ev.message.content.filter((c) => c.type === 'text' && c.text).map((c) => c.text).join('\n');
+              if (text) res.write(text + '\n');
+            } else if (ev.type === 'result') {
+              if (ev.session_id && ev.session_id !== effectiveId) {
+                const chains = loadChains();
+                chains[sessionId] = ev.session_id;
+                fs.writeFileSync(CHAINS_PATH, JSON.stringify(chains, null, 2));
+              }
+              if (ev.is_error && ev.result) res.write('\n[오류] ' + ev.result);
+            }
+          } catch { /* JSON이 아닌 줄은 무시 */ }
+        }
+      });
+      child.stderr.on('data', (d) => { errBuf += d.toString('utf8'); });
       child.on('close', (code) => {
         clearTimeout(killer);
-        if (code !== 0) res.write(`\n[claude 종료 코드 ${code}]`);
+        if (code !== 0) res.write(`\n[claude 종료 코드 ${code}] ${errBuf.slice(0, 2000)}`);
         res.end();
       });
       child.on('error', (err) => {
@@ -455,10 +499,13 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && req.url === '/api/sessions') {
       const titles = loadTitles();
-      sendJson(res, 200, scanSessions(PROJECTS_DIR, cache).map((s) => {
-        const custom = titles[`${s.projectDir}/${s.sessionId}`];
-        return custom ? { ...s, title: custom } : s;
-      }));
+      const chainChildren = new Set(Object.values(loadChains())); // 분기된 자식 세션은 목록에서 숨김 (원본 카드가 대화 전체를 대표)
+      sendJson(res, 200, scanSessions(PROJECTS_DIR, cache)
+        .filter((s) => !chainChildren.has(s.sessionId))
+        .map((s) => {
+          const custom = titles[`${s.projectDir}/${s.sessionId}`];
+          return custom ? { ...s, title: custom } : s;
+        }));
       return;
     }
     if (req.method === 'POST' && req.url === '/api/rename') {
@@ -542,6 +589,27 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       sendJson(res, 200, { turns: extractConversation(fs.readFileSync(src, 'utf8'), 40) });
+      return;
+    }
+    if (req.method === 'GET' && req.url.startsWith('/api/conversation-full?')) {
+      // 원격 채팅 패널용: 사람 프롬프트 + Claude 응답 전문 (마지막 N턴)
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const projectDir = params.get('projectDir') || '';
+      const sessionId = params.get('sessionId') || '';
+      const limit = Math.min(parseInt(params.get('limit') || '30', 10) || 30, 200);
+      if (!SAFE_NAME_RE.test(projectDir) || !SAFE_NAME_RE.test(sessionId) ||
+          ['.', '..'].includes(projectDir) || ['.', '..'].includes(sessionId)) {
+        sendJson(res, 400, { error: '세션 정보가 올바르지 않습니다.' });
+        return;
+      }
+      // 분기 체인이 있으면 최신 분기 파일을 읽는다 (분기 파일에는 이전 대화가 통째로 복사되어 있음)
+      const src = path.join(PROJECTS_DIR, projectDir, resolveChain(sessionId, projectDir) + '.jsonl');
+      if (!fs.existsSync(src)) {
+        sendJson(res, 400, { error: '세션 파일을 찾을 수 없습니다.' });
+        return;
+      }
+      const turns = extractConversationFull(fs.readFileSync(src, 'utf8')).slice(-limit);
+      sendJson(res, 200, { turns });
       return;
     }
     if (req.method === 'GET' && req.url.startsWith('/api/export?')) {
@@ -771,7 +839,9 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       if (!validCwd(res, cwd)) return;
-      launchResume(cwd, sessionId, body.mode);
+      // 원격 프롬프트로 분기된 대화가 있으면 최신 줄기를 연다
+      const chained = loadChains()[sessionId];
+      launchResume(cwd, chained || sessionId, body.mode);
       sendJson(res, 200, { ok: true });
       return;
     }

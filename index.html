@@ -53,7 +53,7 @@
   .folder-item.active .fcount { color: rgba(255,255,255,.8); }
   .pane-empty { font-size: 12px; color: var(--muted); padding: 2px 10px; }
   #remoteBadge { font-size: 12px; color: var(--time); background: var(--time-soft); padding: 2px 8px; border-radius: 9px; font-weight: 600; }
-  #chatLog { margin-top: 6px; max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
+  #chatLog { margin-top: 6px; max-height: 46vh; min-height: 120px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: var(--bg); display: flex; flex-direction: column; gap: 8px; }
   .chat-me { align-self: flex-end; background: var(--accent-soft); border-radius: 12px 12px 3px 12px; padding: 8px 12px; white-space: pre-wrap; word-break: break-word; max-width: 90%; font-size: 12px; }
   .chat-ai { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-radius: 12px 12px 12px 3px; padding: 8px 12px; white-space: pre-wrap; word-break: break-word; max-width: 95%; font-family: Consolas, monospace; font-size: 12px; }
   .chat-row { display: flex; gap: 8px; margin-top: 8px; }
@@ -729,18 +729,16 @@ function renderRemoteDetail(s) {
     </dl>
     <div class="btn-row">
       <button id="remoteOpenBtn"${s.cwd ? '' : ' disabled'}>${ICONS.play} 그쪽 화면에서 열기</button>
-      <button id="convBtn">${ICONS.chat} 최근 대화</button>
     </div>
-    <div id="convList" hidden></div>
-    <div class="pane-title" style="margin: 18px 0 0; padding: 0;">원격 프롬프트 — ${esc(remotePeer.name)}에서 실행되고 응답이 여기로 옵니다</div>
-    <div id="chatLog"></div>
+    <div class="pane-title" style="margin: 18px 0 0; padding: 0;">대화 — 입력하면 ${esc(remotePeer.name)}에서 이어서 실행됩니다</div>
+    <div id="chatLog"><p class="conv-loading">이전 대화 불러오는 중...</p></div>
     <div class="chat-row">
       <textarea id="chatInput" rows="3" placeholder="이 세션에 시킬 내용을 입력..."></textarea>
       <button id="chatSend">보내기</button>
     </div>
     <div id="status" role="status" aria-live="polite"></div>`;
   document.getElementById('detailClose').onclick = () => { selected = null; renderList(); renderDetail(); };
-  document.getElementById('convBtn').onclick = () => toggleConversation(s);
+  loadRemoteHistory(s);
   document.getElementById('remoteOpenBtn').onclick = async () => {
     const $status = document.getElementById('status');
     $status.textContent = '실행 중...';
@@ -757,6 +755,31 @@ function renderRemoteDetail(s) {
   document.getElementById('chatInput').onkeydown = (e) => {
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendRemotePrompt(s);
   };
+}
+
+// 원격 세션의 이전 대화(질문+응답 전문)를 채팅창에 채워서 이어가는 느낌을 만든다
+async function loadRemoteHistory(s) {
+  const $log = document.getElementById('chatLog');
+  try {
+    const res = await proxyCall(`/api/conversation-full?projectDir=${encodeURIComponent(s.projectDir)}&sessionId=${encodeURIComponent(s.sessionId)}&limit=40`);
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    if (!document.getElementById('chatLog')) return; // 그 사이 다른 세션으로 이동함
+    $log.innerHTML = '';
+    if (!body.turns.length) {
+      $log.innerHTML = '<p class="conv-loading">아직 대화가 없습니다 — 아래에 입력해 시작하세요.</p>';
+      return;
+    }
+    for (const t of body.turns) {
+      const div = document.createElement('div');
+      div.className = t.role === 'user' ? 'chat-me' : 'chat-ai';
+      div.textContent = t.text;
+      $log.appendChild(div);
+    }
+    $log.scrollTop = $log.scrollHeight;
+  } catch (err) {
+    if ($log) $log.innerHTML = `<p class="conv-loading">대화 불러오기 실패: ${esc(err.message)}<br>(상대 세션 매니저가 구버전이면 그쪽도 업데이트가 필요합니다)</p>`;
+  }
 }
 
 async function sendRemotePrompt(s) {
