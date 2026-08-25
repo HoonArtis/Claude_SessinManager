@@ -199,6 +199,17 @@
     </div>
   </div>
 </div>
+<div id="kbWarnOverlay" style="display:none; position:fixed; inset:0; background:rgba(28,33,40,.4); z-index:12; align-items:center; justify-content:center;">
+  <div role="alertdialog" aria-modal="true" aria-labelledby="kbWarnTitle" style="background:var(--panel); border-radius:12px; padding:24px; width:460px; max-width:calc(100vw - 24px); box-shadow:0 12px 32px rgba(28,33,40,.18);">
+    <h2 id="kbWarnTitle" style="font-size:15px; margin:0 0 8px; color:#c0392b;">이 키는 주의가 필요합니다</h2>
+    <div id="kbWarnKeys" style="margin:0 0 10px;"></div>
+    <ul id="kbWarnList" style="font-size:13px; color:var(--text); margin:0 0 16px; padding-left:18px; line-height:1.6;"></ul>
+    <div style="display:flex; gap:8px;">
+      <button id="kbWarnYes" style="flex:1; min-height:44px; background:#c0392b; color:#fff; border:0; border-radius:8px; font-size:14px; cursor:pointer;">그래도 수정</button>
+      <button id="kbWarnNo" style="flex:1; min-height:44px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer;">취소</button>
+    </div>
+  </div>
+</div>
 <div id="kbOverlay">
   <div id="kbModal" role="dialog" aria-modal="true" aria-labelledby="kbTitle">
     <h2 id="kbTitle">Windows Terminal 단축키</h2>
@@ -726,6 +737,7 @@ function closeKbModal() {
 }
 
 document.addEventListener('keydown', (e) => {
+  if ($kbWarnOverlay.style.display === 'flex' && e.key === 'Escape') { document.getElementById('kbWarnNo').click(); return; }
   if ($kbOverlay.classList.contains('open') && e.key === 'Escape' && !listeningId) { closeKbModal(); return; }
   if (!listeningId) return;
   e.preventDefault();
@@ -741,6 +753,16 @@ document.addEventListener('keydown', (e) => {
   if (!keys) return;
   const id = listeningId;
   listeningId = null;
+  const warns = keyWarnings(keys);
+  if (warns.length) {
+    openKbWarn(id, keys, warns);
+    return;
+  }
+  proceedAssign(id, keys);
+});
+
+// 배정 진행: 다른 단축키와 겹치면 충돌 확인, 아니면 바로 저장
+function proceedAssign(id, keys) {
   const other = shortcuts.find((s) => s.id !== id && s.currentKeys === keys);
   if (other) {
     pendingConflict = { id, keys, otherId: other.id, otherLabel: other.label };
@@ -749,7 +771,62 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   saveShortcut(id, keys);
-});
+}
+
+// 타이핑·셸 조작을 가로채는 위험한 조합이면 경고 목록을 반환한다
+const SHELL_KEY_RISKS = {
+  'ctrl+c': '실행 중인 프로그램을 중단(Ctrl+C, SIGINT)하는 핵심 키입니다. 덮어쓰면 터미널에서 프로세스를 멈출 수 없게 됩니다.',
+  'ctrl+d': '셸을 종료(EOF)하는 키입니다. 덮어쓰면 셸 종료 습관이 깨집니다.',
+  'ctrl+v': '붙여넣기 기본 키입니다.',
+  'ctrl+z': '작업 일시중지(Unix) 또는 실행취소에 쓰이는 키입니다.',
+  'ctrl+r': '셸 명령 히스토리 검색(Ctrl+R) 키입니다.',
+  'ctrl+l': '화면 지우기(clear) 키입니다.',
+  'ctrl+w': '단어 삭제 등 셸 편집에 쓰이는 키입니다.',
+  'ctrl+a': '줄 처음으로 이동(셸 편집) 키입니다.',
+  'ctrl+e': '줄 끝으로 이동(셸 편집) 키입니다.',
+  'ctrl+k': '커서 뒤 삭제(셸 편집) 키입니다.',
+  'ctrl+u': '커서 앞 삭제(셸 편집) 키입니다.',
+};
+
+function keyWarnings(keys) {
+  const warns = [];
+  const parts = keys.split('+');
+  const key = parts[parts.length - 1];
+  const mods = parts.slice(0, -1);
+  const typeable = key.length === 1 || ['minus', 'plus', 'space'].includes(key);
+  if (mods.length === 1 && mods[0] === 'shift' && typeable) {
+    warns.push('Shift+문자/기호는 타이핑을 가로챕니다 — 터미널에서 해당 대문자·기호를 입력할 수 없게 됩니다.');
+  }
+  if (SHELL_KEY_RISKS[keys]) warns.push(SHELL_KEY_RISKS[keys]);
+  if (warns.length && /^[a-z]$/.test(key)) {
+    warns.push('참고: 문자키 조합은 한글 입력 상태에서는 동작하지 않을 수 있습니다 (IME가 먼저 처리).');
+  }
+  return warns;
+}
+
+const $kbWarnOverlay = document.getElementById('kbWarnOverlay');
+let pendingWarn = null;
+
+function openKbWarn(id, keys, warns) {
+  pendingWarn = { id, keys };
+  document.getElementById('kbWarnKeys').innerHTML = prettyKeysHtml(keys);
+  document.getElementById('kbWarnList').innerHTML = warns.map((w) => `<li>${esc(w)}</li>`).join('');
+  $kbWarnOverlay.style.display = 'flex';
+  document.getElementById('kbWarnNo').focus();
+}
+
+document.getElementById('kbWarnYes').onclick = () => {
+  const { id, keys } = pendingWarn;
+  pendingWarn = null;
+  $kbWarnOverlay.style.display = 'none';
+  proceedAssign(id, keys);
+};
+document.getElementById('kbWarnNo').onclick = () => {
+  pendingWarn = null;
+  $kbWarnOverlay.style.display = 'none';
+  $kbStatus.textContent = '';
+  renderShortcuts();
+};
 
 // 이미 쓰는 키를 눌렀을 때: 둘 다 빨간색으로 표시하고 정말 바꿀지 확인
 function renderConflictPrompt() {
