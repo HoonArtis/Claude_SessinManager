@@ -7,7 +7,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const { scanSessions } = require('./lib/scan-sessions');
 const { getKeybindings, setKeybinding, unsetKeybinding } = require('./lib/wt-keybindings');
 const { trashSessions } = require('./lib/trash-sessions');
-const { parseSession, extractUserPrompts, extractConversation } = require('./lib/parse-session');
+const { parseSession, extractUserPrompts, extractConversation, extractConversationFull } = require('./lib/parse-session');
 const { buildHandoffMd } = require('./lib/handoff');
 
 const SAFE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
@@ -263,6 +263,110 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       sendJson(res, 200, { turns: extractConversation(fs.readFileSync(src, 'utf8'), 40) });
+      return;
+    }
+    if (req.method === 'GET' && req.url.startsWith('/api/export?')) {
+      // 세션 대화 전문을 마크다운 파일로 다운로드
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const projectDir = params.get('projectDir') || '';
+      const sessionId = params.get('sessionId') || '';
+      if (!SAFE_NAME_RE.test(projectDir) || !SAFE_NAME_RE.test(sessionId) ||
+          ['.', '..'].includes(projectDir) || ['.', '..'].includes(sessionId)) {
+        sendJson(res, 400, { error: '세션 정보가 올바르지 않습니다.' });
+        return;
+      }
+      const src = path.join(PROJECTS_DIR, projectDir, sessionId + '.jsonl');
+      if (!fs.existsSync(src)) {
+        sendJson(res, 400, { error: '세션 파일을 찾을 수 없습니다.' });
+        return;
+      }
+      const text = fs.readFileSync(src, 'utf8');
+      const meta = parseSession(text);
+      const titles = loadTitles();
+      const title = titles[`${projectDir}/${sessionId}`] || meta.title || '(제목 없음)';
+      const turns = extractConversationFull(text);
+      const md = [
+        `# ${title}`,
+        '',
+        `- 작업 폴더: ${meta.cwd || '-'}`,
+        `- 기간: ${meta.firstTimestamp || '-'} ~ ${meta.lastTimestamp || '-'}`,
+        `- 메시지 ${meta.messageCount}개 · 토큰 ${meta.totalTokens.toLocaleString()}`,
+        `- 세션 ID: ${sessionId}`,
+        '',
+        '---',
+        '',
+        ...turns.map((t) => (t.role === 'user' ? `## 🙋 나\n\n${t.text}\n` : `## 🤖 Claude\n\n${t.text}\n`)),
+      ].join('\n');
+      const fname = title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 60) + '.md';
+      res.writeHead(200, {
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(fname)}`,
+      });
+      res.end(md);
+      return;
+    }
+    if (req.method === 'GET' && req.url.startsWith('/api/export-raw?')) {
+      // 세션 원본(.jsonl) 그대로 다운로드 — 다른 PC의 .claude\projects\<projectDir>\에 넣으면 이어서 쓸 수 있다
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const projectDir = params.get('projectDir') || '';
+      const sessionId = params.get('sessionId') || '';
+      if (!SAFE_NAME_RE.test(projectDir) || !SAFE_NAME_RE.test(sessionId) ||
+          ['.', '..'].includes(projectDir) || ['.', '..'].includes(sessionId)) {
+        sendJson(res, 400, { error: '세션 정보가 올바르지 않습니다.' });
+        return;
+      }
+      const src = path.join(PROJECTS_DIR, projectDir, sessionId + '.jsonl');
+      if (!fs.existsSync(src)) {
+        sendJson(res, 400, { error: '세션 파일을 찾을 수 없습니다.' });
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/jsonl; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${sessionId}.jsonl"`,
+        'X-Project-Dir': projectDir,
+      });
+      fs.createReadStream(src).pipe(res);
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/resume-multi') {
+      // 선택한 세션 여러 개를 한 창에서 분할(또는 탭)로 한꺼번에 연다
+      let body;
+      try {
+        body = JSON.parse(await readBody(req));
+      } catch {
+        sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' });
+        return;
+      }
+      const items = Array.isArray(body && body.items) ? body.items : [];
+      const asTabs = body.mode === 'tabs';
+      const max = asTabs ? 8 : 4;
+      if (!items.length || items.length > max) {
+        sendJson(res, 400, { error: `세션은 1~${max}개까지 선택할 수 있습니다.` });
+        return;
+      }
+      for (const it of items) {
+        if (!SESSION_ID_RE.test(String(it.sessionId || '')) || !it.cwd || !fs.existsSync(it.cwd)) {
+          sendJson(res, 400, { error: `세션 정보가 올바르지 않습니다: ${it.sessionId || '(없음)'}` });
+          return;
+        }
+      }
+      if (!hasWt) {
+        // WT가 없으면 분할이 불가하므로 각각 새 창으로 연다
+        for (const it of items) launchResume(it.cwd, it.sessionId, 'window');
+        sendJson(res, 200, { ok: true, fallback: 'windows' });
+        return;
+      }
+      // wt 한 번 호출로 새 탭 + 분할들을 이어붙인다: nt ... ; sp -V ... ; sp -H ...
+      const args = [];
+      items.forEach((it, i) => {
+        if (i > 0) args.push(';');
+        if (i === 0) args.push('-w', 'new', 'nt');
+        else args.push('sp', i % 2 === 1 ? '-V' : '-H');
+        args.push('-d', it.cwd, 'cmd', '/k', `claude --resume ${it.sessionId}`);
+      });
+      const child = spawn('wt', args, { detached: true, stdio: 'ignore' });
+      child.unref();
+      sendJson(res, 200, { ok: true });
       return;
     }
     if (req.method === 'GET' && req.url.startsWith('/api/handoff-preview?')) {

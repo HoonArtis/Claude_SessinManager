@@ -66,9 +66,21 @@
   .meta .time { color: var(--time); background: var(--time-soft); font-weight: 600; padding: 1px 7px; border-radius: 9px; }
   .meta .tokens { color: var(--token); background: var(--token-soft); font-weight: 600; padding: 1px 7px; border-radius: 9px; }
   .row .check { display: none; position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 6px; background: var(--panel); align-items: center; justify-content: center; color: #fff; }
-  body.delete-mode .row .check { display: flex; }
+  body.delete-mode .row .check, body.multi-mode .row .check { display: flex; }
   body.delete-mode .row.checked { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
   body.delete-mode .row.checked .check { background: var(--danger); border-color: var(--danger); }
+  body.multi-mode .row.checked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  body.multi-mode .row.checked .check { background: var(--accent); border-color: var(--accent); }
+  #multiBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 13px; color: var(--text); cursor: pointer; }
+  #multiBtn:hover, body.multi-mode #multiBtn { border-color: var(--accent); color: var(--accent); }
+  #multiBar { display: none; position: sticky; bottom: 0; grid-column: 1 / -1; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; box-shadow: 0 -4px 16px rgba(28,33,40,.08); align-items: center; gap: 12px; }
+  body.multi-mode #multiBar { display: flex; }
+  #multiBar .count { flex: 1; font-size: 13px; }
+  #multiBar button { min-height: 40px; padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+  #multiSplitBtn { background: var(--accent); color: #fff; border: 0; }
+  #multiSplitBtn:disabled, #multiTabsBtn:disabled { opacity: .5; cursor: default; }
+  #multiTabsBtn { background: var(--accent-soft); color: var(--accent-deep); border: 1px solid var(--accent); }
+  #multiCancelBtn { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
   #empty-msg { grid-column: 1 / -1; }
   #delBar { display: none; position: sticky; bottom: 0; grid-column: 1 / -1; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; box-shadow: 0 -4px 16px rgba(28,33,40,.08); align-items: center; gap: 12px; }
   body.delete-mode #delBar { display: flex; }
@@ -160,6 +172,7 @@
   <input id="search" type="search" placeholder="제목·프롬프트 검색..." aria-label="세션 제목과 프롬프트 검색">
   <label><input id="showEmpty" type="checkbox"> 빈 세션 표시</label>
   <button id="kbBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></svg> 터미널 단축키</button>
+  <button id="multiBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg> 동시 열기</button>
   <button id="delBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> 삭제</button>
   <button id="backupBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 10v5M9.5 12.5 12 15l2.5-2.5"/></svg> 백업 폴더</button>
   <button id="verUpdateBtn" hidden>버전 업데이트하기</button>
@@ -266,6 +279,8 @@ const ICONS = {
   bolt: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>',
   token: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M8.5 9.5c0-1.4 1.5-2.2 3.5-2.2s3.5.8 3.5 2.2-1.5 2-3.5 2.3-3.5.9-3.5 2.2 1.5 2.2 3.5 2.2 3.5-.8 3.5-2.2"/></svg>',
   pencil: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 20l1.5-4.5L16 5l3 3L8.5 18.5 4 20z"/><path d="M14 7l3 3"/></svg>',
+  download: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 19h16"/></svg>',
+  grid: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>',
 };
 
 // 메시지가 많은 세션은 컨텍스트 오염(자동 압축, 응답 지연) 가능성이 높다
@@ -392,8 +407,17 @@ function renderList() {
       <button id="delCancelBtn">취소</button>
       <button id="delConfirmBtn"${checked.size ? '' : ' disabled'}>선택 삭제</button>
     </div>`;
+  const multiBar = `
+    <div id="multiBar">
+      <span class="count">${checked.size}개 선택 — 한 창에서 분할(최대 4개) 또는 탭(최대 8개)으로 한꺼번에 이어서 엽니다</span>
+      <button id="multiCancelBtn">취소</button>
+      <button id="multiTabsBtn"${checked.size >= 1 && checked.size <= 8 ? '' : ' disabled'}>탭으로 열기</button>
+      <button id="multiSplitBtn"${checked.size >= 1 && checked.size <= 4 ? '' : ' disabled'}>분할로 열기</button>
+    </div>`;
+  const bars = (deleteMode ? delBar : '') + (multiMode ? multiBar : '');
   if (!items.length) {
-    $list.innerHTML = '<p id="empty-msg">표시할 세션이 없습니다.</p>' + (deleteMode ? delBar : '');
+    $list.innerHTML = '<p id="empty-msg">표시할 세션이 없습니다.</p>' + bars;
+    wireBars();
     return;
   }
   $list.innerHTML = items.map((s) => `
@@ -408,10 +432,19 @@ function renderList() {
           <span class="tokens" title="사용 토큰 (입력+출력+캐시)">${ICONS.token} ${formatTokens(s.totalTokens)}</span>
         </span>
       </div>
-    </button>`).join('') + (deleteMode ? delBar : '');
+    </button>`).join('') + bars;
+  wireBars();
+}
+
+function wireBars() {
   if (deleteMode) {
     document.getElementById('delCancelBtn').onclick = exitDeleteMode;
     document.getElementById('delConfirmBtn').onclick = openDeleteConfirm;
+  }
+  if (multiMode) {
+    document.getElementById('multiCancelBtn').onclick = exitMultiMode;
+    document.getElementById('multiTabsBtn').onclick = () => openMulti('tabs');
+    document.getElementById('multiSplitBtn').onclick = () => openMulti('split');
   }
 }
 
@@ -454,6 +487,8 @@ function renderDetail() {
     ${heavySession(s) ? '<p class="speedup-hint">이 세션은 메시지가 많아 컨텍스트 오염 가능성이 있습니다. 초기화를 권장합니다.</p>' : ''}
     <div class="btn-row">
       <button id="convBtn">${ICONS.chat} 최근 대화 보기</button>
+      <button id="exportBtn">${ICONS.download} MD 내보내기</button>
+      <button id="exportRawBtn" title="세션 원본(.jsonl) 다운로드 — 다른 PC의 .claude\\projects에 넣으면 그대로 이어서 쓸 수 있음">${ICONS.download} 원본</button>
     </div>
     <div id="convList" hidden></div>
     <div id="status" role="status" aria-live="polite"></div>`;
@@ -468,6 +503,12 @@ function renderDetail() {
   });
   document.getElementById('speedupBtn').onclick = () => openSpeedupConfirm(s);
   document.getElementById('convBtn').onclick = () => toggleConversation(s);
+  document.getElementById('exportBtn').onclick = () => {
+    window.location = `/api/export?projectDir=${encodeURIComponent(s.projectDir)}&sessionId=${encodeURIComponent(s.sessionId)}`;
+  };
+  document.getElementById('exportRawBtn').onclick = () => {
+    window.location = `/api/export-raw?projectDir=${encodeURIComponent(s.projectDir)}&sessionId=${encodeURIComponent(s.sessionId)}`;
+  };
   document.getElementById('detailClose').onclick = () => { selected = null; renderList(); renderDetail(); };
   document.getElementById('renameBtn').onclick = () => startRename(s);
 }
@@ -579,7 +620,7 @@ document.getElementById('heavyOnly').addEventListener('change', renderList);
 $list.addEventListener('click', (e) => {
   const row = e.target.closest('.row');
   if (!row) return;
-  if (deleteMode) {
+  if (deleteMode || multiMode) {
     const id = row.dataset.id;
     if (checked.has(id)) checked.delete(id); else checked.add(id);
     renderList();
@@ -589,6 +630,50 @@ $list.addEventListener('click', (e) => {
   renderList();
   renderDetail();
 });
+
+// ---- 동시 열기 (여러 세션을 분할/탭으로 한꺼번에 resume) ----
+let multiMode = false;
+const $multiBtn = document.getElementById('multiBtn');
+
+function exitMultiMode() {
+  multiMode = false;
+  checked.clear();
+  document.body.classList.remove('multi-mode');
+  $multiBtn.setAttribute('aria-pressed', 'false');
+  renderList();
+}
+
+$multiBtn.onclick = () => {
+  if (multiMode) { exitMultiMode(); return; }
+  if (deleteMode) exitDeleteMode();
+  multiMode = true;
+  selected = null;
+  renderDetail();
+  document.body.classList.add('multi-mode');
+  $multiBtn.setAttribute('aria-pressed', 'true');
+  renderList();
+};
+
+async function openMulti(mode) {
+  const items = sessions
+    .filter((s) => checked.has(s.sessionId) && s.cwd)
+    .map((s) => ({ sessionId: s.sessionId, cwd: s.cwd }));
+  if (!items.length) return;
+  const $count = document.querySelector('#multiBar .count');
+  if ($count) $count.textContent = '터미널 여는 중...';
+  try {
+    const res = await fetch('/api/resume-multi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items, mode }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    exitMultiMode();
+  } catch (err) {
+    if ($count) $count.textContent = '실패: ' + err.message;
+  }
+}
 
 // ---- 세션 삭제 (휴지통 이동) ----
 let deleteMode = false;
@@ -606,6 +691,7 @@ function exitDeleteMode() {
 
 $delBtn.onclick = () => {
   if (deleteMode) { exitDeleteMode(); return; }
+  if (multiMode) exitMultiMode();
   deleteMode = true;
   selected = null;
   renderDetail();

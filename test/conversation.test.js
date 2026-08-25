@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { extractConversation } = require('../lib/parse-session');
+const { extractConversation, extractConversationFull } = require('../lib/parse-session');
 
 const line = (obj) => JSON.stringify(obj);
 
@@ -18,6 +18,20 @@ test('사람 프롬프트는 전문, assistant 턴은 하나로 접어서 반환
     { role: 'assistant' },
     { role: 'user', text: '둘째 질문' },
     { role: 'assistant' },
+  ]);
+});
+
+test('extractConversationFull은 assistant 응답 전문을 담고 연속 레코드를 합친다', () => {
+  const text = [
+    line({ type: 'user', origin: { kind: 'human' }, message: { role: 'user', content: '첫 질문' } }),
+    line({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: '답변 A' }] } }),
+    line({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: '답변 B' }] } }),
+    line({ type: 'user', origin: { kind: 'human' }, message: { role: 'user', content: '둘째 질문' } }),
+  ].join('\n');
+  assert.deepStrictEqual(extractConversationFull(text), [
+    { role: 'user', text: '첫 질문' },
+    { role: 'assistant', text: '답변 A\n\n답변 B' },
+    { role: 'user', text: '둘째 질문' },
   ]);
 });
 
