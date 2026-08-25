@@ -861,5 +861,8 @@ document.getElementById('kbBtn').onclick = () => { $kbOverlay.classList.add('ope
 document.getElementById('kbClose').onclick = closeKbModal;
 $kbOverlay.addEventListener('click', (e) => { if (e.target === $kbOverlay) closeKbModal(); });
 
+// 서버 생존 신호 — 이 페이지(탭)들이 모두 닫히면 서버가 스스로 꺼진다
+new EventSource('/api/alive');
+
 load();
 </script>

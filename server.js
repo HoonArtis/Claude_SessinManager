@@ -91,8 +91,43 @@ function validCwd(res, cwd) {
   return true;
 }
 
+// --- 브라우저 탭이 모두 닫히면 서버 자동 종료 ---
+// 페이지가 SSE(/api/alive)로 연결을 유지한다. 연결 수가 0이 되면 GRACE_MS 뒤 종료
+// (새로고침·재접속 여유). 시작 후 아무도 접속하지 않으면 BOOT_GRACE_MS 뒤 종료.
+const GRACE_MS = 15000;
+const BOOT_GRACE_MS = 60000;
+let aliveClients = 0;
+let shutdownTimer = setTimeout(() => process.exit(0), BOOT_GRACE_MS);
+
+function cancelShutdown() {
+  if (shutdownTimer) { clearTimeout(shutdownTimer); shutdownTimer = null; }
+}
+
+function scheduleShutdown(ms) {
+  cancelShutdown();
+  shutdownTimer = setTimeout(() => {
+    if (aliveClients <= 0) {
+      console.log('브라우저가 모두 닫혀 서버를 종료합니다.');
+      process.exit(0);
+    }
+  }, ms);
+}
+
 const server = http.createServer(async (req, res) => {
   try {
+    if (req.method === 'GET' && req.url === '/api/alive') {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+      res.write('data: ok\n\n');
+      aliveClients++;
+      cancelShutdown();
+      const ping = setInterval(() => res.write(':ping\n\n'), 30000);
+      req.on('close', () => {
+        clearInterval(ping);
+        aliveClients--;
+        if (aliveClients <= 0) scheduleShutdown(GRACE_MS);
+      });
+      return;
+    }
     if (req.method === 'GET' && req.url === '/') {
       const html = fs.readFileSync(path.join(__dirname, 'index.html'));
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
