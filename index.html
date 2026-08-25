@@ -1,0 +1,155 @@
+<meta charset="utf-8">
+<title>Claude 세션 매니저</title>
+<style>
+  :root { --bg: #f6f7f9; --panel: #fff; --border: #e2e5ea; --text: #1c2128; --muted: #6b7280; --accent: #c96442; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
+  header { padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; gap: 16px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0; }
+  #search { flex: 1; max-width: 480px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; }
+  header label { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #list { flex: 1; overflow-y: auto; padding: 12px; }
+  .row { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; cursor: pointer; }
+  .row:hover { border-color: var(--accent); }
+  .row.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .row .title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .row .meta { font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+  #detail { width: 40%; min-width: 320px; max-width: 560px; background: var(--panel); border-left: 1px solid var(--border); padding: 20px; overflow-y: auto; display: none; }
+  #detail.open { display: block; }
+  #detail h2 { font-size: 15px; margin: 0 0 12px; }
+  #detail dl { font-size: 13px; }
+  #detail dt { color: var(--muted); margin-top: 10px; }
+  #detail dd { margin: 2px 0 0; word-break: break-all; white-space: pre-wrap; }
+  .btn-row { display: flex; gap: 8px; margin-top: 16px; }
+  .btn-row button { flex: 1; padding: 10px; border: 0; border-radius: 8px; font-size: 14px; cursor: pointer; }
+  #resumeBtn { background: var(--accent); color: #fff; }
+  #openBtn { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+  .btn-row button:disabled { opacity: .5; cursor: default; }
+  #status { margin-top: 8px; font-size: 13px; color: var(--muted); min-height: 18px; }
+  #empty-msg { color: var(--muted); text-align: center; margin-top: 40px; }
+</style>
+<header>
+  <h1>Claude 세션 매니저</h1>
+  <input id="search" type="search" placeholder="제목·프롬프트 검색...">
+  <label><input id="showEmpty" type="checkbox"> 빈 세션 표시</label>
+</header>
+<main>
+  <div id="list"></div>
+  <aside id="detail"></aside>
+</main>
+<script>
+'use strict';
+let sessions = [];
+let selected = null;
+const $list = document.getElementById('list');
+const $detail = document.getElementById('detail');
+const $search = document.getElementById('search');
+const $showEmpty = document.getElementById('showEmpty');
+
+function relTime(iso) {
+  if (!iso) return '-';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return '방금 전';
+  if (m < 60) return m + '분 전';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + '시간 전';
+  const d = Math.floor(h / 24);
+  if (d < 30) return d + '일 전';
+  return new Date(iso).toLocaleDateString('ko-KR');
+}
+
+function esc(s) {
+  const div = document.createElement('div');
+  div.textContent = s == null ? '' : String(s);
+  return div.innerHTML;
+}
+
+function visible() {
+  const q = $search.value.trim().toLowerCase();
+  return sessions.filter((s) => {
+    if (s.empty && !$showEmpty.checked) return false;
+    if (!q) return true;
+    return [s.title, s.firstPrompt, s.lastPrompt, s.cwd]
+      .some((f) => f && f.toLowerCase().includes(q));
+  });
+}
+
+function renderList() {
+  const items = visible();
+  if (!items.length) {
+    $list.innerHTML = '<p id="empty-msg">표시할 세션이 없습니다.</p>';
+    return;
+  }
+  $list.innerHTML = items.map((s) => `
+    <div class="row${selected === s.sessionId ? ' active' : ''}" data-id="${esc(s.sessionId)}">
+      <div class="title">${esc(s.title || '(제목 없음)')}</div>
+      <div class="meta">
+        <span>📁 ${esc(s.cwd || '(경로 없음)')}</span>
+        <span>🕒 ${relTime(s.lastTimestamp)}</span>
+        <span>💬 ${s.messageCount}</span>
+      </div>
+    </div>`).join('');
+}
+
+function renderDetail() {
+  const s = sessions.find((x) => x.sessionId === selected);
+  if (!s) { $detail.classList.remove('open'); return; }
+  const durMs = s.firstTimestamp && s.lastTimestamp ? new Date(s.lastTimestamp) - new Date(s.firstTimestamp) : 0;
+  const durMin = Math.round(durMs / 60000);
+  $detail.classList.add('open');
+  $detail.innerHTML = `
+    <h2>${esc(s.title || '(제목 없음)')}</h2>
+    <dl>
+      <dt>작업 폴더</dt><dd>${esc(s.cwd || '-')}</dd>
+      <dt>마지막 활동</dt><dd>${relTime(s.lastTimestamp)} (${esc(s.lastTimestamp || '-')})</dd>
+      <dt>작업 시간</dt><dd>약 ${durMin}분 · 메시지 ${s.messageCount}개</dd>
+      <dt>git 브랜치</dt><dd>${esc(s.gitBranch || '-')}</dd>
+      <dt>첫 프롬프트</dt><dd>${esc((s.firstPrompt || '-').slice(0, 1000))}</dd>
+      <dt>마지막 프롬프트</dt><dd>${esc((s.lastPrompt || '-').slice(0, 1000))}</dd>
+      <dt>세션 ID</dt><dd>${esc(s.sessionId)}</dd>
+    </dl>
+    <div class="btn-row">
+      <button id="resumeBtn"${s.cwd ? '' : ' disabled'}>▶ 이어서 작업</button>
+      <button id="openBtn"${s.cwd ? '' : ' disabled'}>📂 폴더 열기</button>
+    </div>
+    <div id="status"></div>`;
+  document.getElementById('resumeBtn').onclick = () => callApi('/api/resume', s, '터미널을 열었습니다.');
+  document.getElementById('openBtn').onclick = () => callApi('/api/open-folder', s, '탐색기를 열었습니다.');
+}
+
+async function callApi(url, s, okMsg) {
+  const $status = document.getElementById('status');
+  $status.textContent = '실행 중...';
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: s.sessionId, cwd: s.cwd }),
+    });
+    const body = await res.json();
+    $status.textContent = res.ok ? okMsg : '실패: ' + body.error;
+  } catch (err) {
+    $status.textContent = '실패: ' + err.message;
+  }
+}
+
+async function load() {
+  const res = await fetch('/api/sessions');
+  sessions = await res.json();
+  renderList();
+  renderDetail();
+}
+
+$list.addEventListener('click', (e) => {
+  const row = e.target.closest('.row');
+  if (!row) return;
+  selected = row.dataset.id;
+  renderList();
+  renderDetail();
+});
+$search.addEventListener('input', renderList);
+$showEmpty.addEventListener('change', renderList);
+load();
+</script>
