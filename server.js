@@ -161,6 +161,31 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, { turns: extractConversation(fs.readFileSync(src, 'utf8'), 40) });
       return;
     }
+    if (req.method === 'GET' && req.url.startsWith('/api/handoff-preview?')) {
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const projectDir = params.get('projectDir') || '';
+      const sessionId = params.get('sessionId') || '';
+      if (!SAFE_NAME_RE.test(projectDir) || !SAFE_NAME_RE.test(sessionId) ||
+          ['.', '..'].includes(projectDir) || ['.', '..'].includes(sessionId)) {
+        sendJson(res, 400, { error: '세션 정보가 올바르지 않습니다.' });
+        return;
+      }
+      const src = path.join(PROJECTS_DIR, projectDir, sessionId + '.jsonl');
+      if (!fs.existsSync(src)) {
+        sendJson(res, 400, { error: '세션 파일을 찾을 수 없습니다.' });
+        return;
+      }
+      const text = fs.readFileSync(src, 'utf8');
+      const meta = parseSession(text);
+      const md = buildHandoffMd({
+        ...meta,
+        sessionId,
+        prompts: extractUserPrompts(text, 30),
+        backupPath: path.join(PROJECTS_DIR, '.csm-session-backups', projectDir, sessionId + '.jsonl'),
+      });
+      sendJson(res, 200, { md, handoffPath: meta.cwd ? path.join(meta.cwd, 'CLAUDE-HANDOFF.md') : null });
+      return;
+    }
     if (req.method === 'POST' && req.url === '/api/open-backups') {
       const dir = path.join(PROJECTS_DIR, '.csm-session-backups');
       fs.mkdirSync(dir, { recursive: true });

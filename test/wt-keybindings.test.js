@@ -51,6 +51,16 @@ test('setKeybinding은 같은 id의 기존 오버라이드와 새 키와 충돌�
   assert.ok(!out.keybindings.some((k) => k.id === 'Terminal.CopyToClipboard'), '새 키와 충돌하는 기존 바인딩은 제거된다');
 });
 
+test('기본 키가 없는 단축키(SwapPane 등)는 currentKeys가 null이고, 설정 시 unbind 항목을 만들지 않는다', () => {
+  const text = settings([]);
+  const before = getKeybindings(text).find((s) => s.id === 'Terminal.SwapPaneLeft');
+  assert.strictEqual(before.currentKeys, null);
+  const out = JSON.parse(setKeybinding(text, 'Terminal.SwapPaneLeft', 'ctrl+alt+left'));
+  const entry = out.keybindings.find((k) => k.id === 'Terminal.SwapPaneLeft');
+  assert.strictEqual(entry.keys, 'ctrl+alt+left');
+  assert.ok(!out.keybindings.some((k) => k.id === null), '기본 키가 없으니 unbind 항목이 없어야 한다');
+});
+
 test('기본 키로 되돌리면 unbind 항목 없이 오버라이드만 정리된다', () => {
   const text = settings([
     { id: 'Terminal.ClosePane', keys: 'ctrl+alt+w' },
