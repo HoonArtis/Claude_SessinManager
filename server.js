@@ -295,10 +295,11 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       sendJson(res, 200, { ok: true });
-      // 포트가 비워진 1초 뒤 새 프로세스가 뜨도록 예약하고 종료
+      // 포트가 비워진 뒤 새 프로세스가 뜨도록 예약하고 종료
+      // cmd 경유는 detached 시 콘솔창이 잠깐 보이므로, GUI 앱인 wscript로 창 없이 띄운다
       setTimeout(() => {
-        const child = spawn('cmd', ['/c', 'timeout /t 1 /nobreak >nul & node server.js'], {
-          cwd: __dirname, detached: true, stdio: 'ignore', windowsHide: true,
+        const child = spawn('wscript', [path.join(__dirname, 'restart.vbs')], {
+          cwd: __dirname, detached: true, stdio: 'ignore',
         });
         child.unref();
         process.exit(0);
