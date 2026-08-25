@@ -136,6 +136,13 @@ function readBody(req) {
 
 const hasWt = spawnSync('where', ['wt'], { windowsHide: true }).status === 0;
 
+// 이 서버가 Claude Code 세션 안에서 실행됐을 수 있다. 그 표식이 자식(claude/터미널)에
+// 대물림되면 새 세션이 대화 기록을 저장하지 않으므로, 실행 환경에서 항상 제거한다.
+const CLEAN_ENV = { ...process.env };
+for (const k of Object.keys(CLEAN_ENV)) {
+  if (k === 'CLAUDECODE' || k.startsWith('CLAUDE_CODE_')) delete CLEAN_ENV[k];
+}
+
 // 부팅 시점의 커밋 = 지금 실행 중인 코드의 버전 (이후 pull로 HEAD가 움직여도 불변)
 const BOOT_COMMIT = (() => {
   const r = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: __dirname, windowsHide: true, encoding: 'utf8' });
@@ -175,7 +182,7 @@ function launchInTerminal(cwd, claudeCmd, mode) {
   let child;
   if (hasWt) {
     const openArgs = OPEN_MODES[normalizeMode(mode)];
-    child = spawn('wt', [...openArgs, '-d', cwd, 'cmd', '/k', claudeCmd], { detached: true, stdio: 'ignore' });
+    child = spawn('wt', [...openArgs, '-d', cwd, 'cmd', '/k', claudeCmd], { detached: true, stdio: 'ignore', env: CLEAN_ENV });
   } else {
     child = spawn('cmd', ['/c', 'start', '"claude"', 'cmd', '/k', `cd /d "${cwd}" && ${claudeCmd}`], {
       detached: true,
@@ -639,7 +646,7 @@ const server = http.createServer(async (req, res) => {
         else args.push('mf', 'left', ';', 'sp', '-H');
         args.push('-d', it.cwd, 'cmd', '/k', `claude --resume ${it.sessionId}`);
       });
-      const child = spawn('wt', args, { detached: true, stdio: 'ignore' });
+      const child = spawn('wt', args, { detached: true, stdio: 'ignore', env: CLEAN_ENV });
       child.unref();
       sendJson(res, 200, { ok: true });
       return;
