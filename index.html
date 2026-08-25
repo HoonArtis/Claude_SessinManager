@@ -183,12 +183,18 @@ const $kbStatus = document.getElementById('kbStatus');
 let shortcuts = [];
 let listeningId = null;
 
+// WT 키 표기를 읽기 좋은 기호로 변환 (표시 전용 — 저장은 WT 형식 그대로)
+function prettyKeys(keys) {
+  const symbols = { minus: '-', plus: '+', left: '←', right: '→', up: '↑', down: '↓' };
+  return keys.split('+').map((k) => symbols[k] || k).join('+');
+}
+
 function renderShortcuts() {
   $kbList.innerHTML = shortcuts.map((s) => `
     <div class="kb-row">
       <span class="kb-label">${esc(s.label)}</span>
       <span class="kb-key${listeningId === s.id ? ' listening' : ''}${s.currentKeys !== s.defaultKeys ? ' changed' : ''}" data-id="${esc(s.id)}">
-        ${listeningId === s.id ? '키를 누르세요...' : esc(s.currentKeys)}
+        ${listeningId === s.id ? '키를 누르세요...' : esc(prettyKeys(s.currentKeys))}
       </span>
     </div>`).join('');
 }
