@@ -514,12 +514,15 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 200, { ok: true, fallback: 'windows' });
         return;
       }
-      // wt 한 번 호출로 새 탭 + 분할들을 이어붙인다: nt ... ; sp -V ... ; sp -H ...
+      // wt 한 번 호출로 새 탭 + 분할들을 이어붙인다.
+      // 2개: 좌|우, 3개: 좌(전체높이)|우상/우하, 4개: 2x2(田) — 4번째는 왼쪽으로 포커스를 옮겨 쪼갠다
       const args = [];
       items.forEach((it, i) => {
         if (i > 0) args.push(';');
         if (i === 0) args.push('-w', 'new', 'nt');
-        else args.push('sp', i % 2 === 1 ? '-V' : '-H');
+        else if (i === 1) args.push('sp', '-V');
+        else if (i === 2) args.push('sp', '-H');
+        else args.push('mf', 'left', ';', 'sp', '-H');
         args.push('-d', it.cwd, 'cmd', '/k', `claude --resume ${it.sessionId}`);
       });
       const child = spawn('wt', args, { detached: true, stdio: 'ignore' });
