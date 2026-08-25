@@ -20,9 +20,16 @@ node server.js
 - [이어서 작업] — 해당 폴더에서 새 터미널로 `claude --resume` 실행
 - [폴더 열기] — 작업 폴더를 탐색기로 열기
 - 빈 세션 숨김/표시 토글
-- [⌨ 터미널 단축키] — Windows Terminal 분할/이동/닫기 단축키를 앱에서
+- [⌨ 터미널 단축키] — Windows Terminal 탭/분할/편집/보기 단축키를 앱에서
   변경하면 실제 settings.json에 즉시 반영 (저장 전 자동 백업:
   `settings.json.csm-backup`)
+- [삭제] — 삭제 모드에서 세션을 다중 선택해 정리. 완전 삭제가 아니라
+  `~/.claude/projects/.csm-trash/`로 이동하므로 되돌릴 수 있음
+- [⚡ 세션 초기화 (속도업)] — 컨텍스트가 무거워진 세션(카드에
+  "초기화 권장" 배지)을 빠른 새 세션으로 이어가기:
+  1. 요청 이력·다음 할 일을 작업 폴더의 `CLAUDE-HANDOFF.md`로 저장
+  2. 기존 세션을 `~/.claude/projects/.csm-session-backups/`에 보관
+  3. 새 터미널에서 fresh Claude 세션이 핸드오프 문서를 읽고 시작
 
 ## 테스트
 
