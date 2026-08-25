@@ -126,6 +126,8 @@
   #kbConflictYes { background: #c0392b; color: #fff; border: 0; }
   #kbConflictNo { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
   #kbStatus { margin-top: 12px; font-size: 13px; color: var(--muted); min-height: 18px; }
+  #kbUnbindBtn { margin-left: 8px; min-height: 32px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 12px; cursor: pointer; }
+  #kbUnbindBtn:hover { border-color: #c0392b; color: #c0392b; }
   #kbClose { margin-top: 12px; width: 100%; min-height: 44px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; cursor: pointer; }
   #kbClose:hover { border-color: var(--accent); color: var(--accent); }
   @media (max-width: 768px) {
@@ -688,7 +690,9 @@ async function saveShortcut(id, keys) {
     const body = await res.json();
     if (!res.ok) { $kbStatus.textContent = '실패: ' + body.error; return; }
     shortcuts = body.shortcuts;
-    $kbStatus.textContent = '저장했습니다 — 터미널에 바로 적용됩니다.';
+    $kbStatus.textContent = keys === null
+      ? '등록 해제했습니다 — 이 키는 이제 아무 동작도 하지 않습니다.'
+      : '저장했습니다 — 터미널에 바로 적용됩니다.';
   } catch (err) {
     $kbStatus.textContent = '실패: ' + err.message;
   }
@@ -700,7 +704,16 @@ $kbList.addEventListener('click', (e) => {
   if (!el) return;
   clearConflict();
   listeningId = listeningId === el.dataset.id ? null : el.dataset.id;
-  $kbStatus.textContent = listeningId ? '원하는 키 조합을 누르세요 (수정키 + 키). ESC로 취소.' : '';
+  if (listeningId) {
+    $kbStatus.innerHTML = '원하는 키 조합을 누르세요 (수정키 + 키). ESC로 취소. <button id="kbUnbindBtn">등록 안 함</button>';
+    document.getElementById('kbUnbindBtn').onclick = () => {
+      const id = listeningId;
+      listeningId = null;
+      saveShortcut(id, null);
+    };
+  } else {
+    $kbStatus.textContent = '';
+  }
   renderShortcuts();
 });
 
@@ -717,6 +730,12 @@ document.addEventListener('keydown', (e) => {
   if (!listeningId) return;
   e.preventDefault();
   if (e.key === 'Escape') { listeningId = null; $kbStatus.textContent = ''; renderShortcuts(); return; }
+  if (e.key === 'Delete' || e.key === 'Backspace') { // 지우기 키 = 등록 안 함
+    const id = listeningId;
+    listeningId = null;
+    saveShortcut(id, null);
+    return;
+  }
   if (e.key === 'Enter' || e.key === ' ') return; // 버튼 재활성화 키는 조합으로 오인하지 않음
   const keys = eventToWtKeys(e);
   if (!keys) return;

@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert');
-const { SHORTCUTS, getKeybindings, setKeybinding } = require('../lib/wt-keybindings');
+const { SHORTCUTS, getKeybindings, setKeybinding, unsetKeybinding } = require('../lib/wt-keybindings');
 
 const settings = (keybindings) => JSON.stringify({ $schema: 'x', profiles: {}, keybindings });
 
@@ -59,6 +59,50 @@ test('기본 키가 없는 단축키(SwapPane 등)는 currentKeys가 null이고,
   const entry = out.keybindings.find((k) => k.id === 'Terminal.SwapPaneLeft');
   assert.strictEqual(entry.keys, 'ctrl+alt+left');
   assert.ok(!out.keybindings.some((k) => k.id === null), '기본 키가 없으니 unbind 항목이 없어야 한다');
+});
+
+test('unsetKeybinding은 오버라이드를 제거하고 기본 키를 unbind해서 currentKeys가 null이 된다', () => {
+  const text = settings([{ id: 'Terminal.ClosePane', keys: 'ctrl+alt+w' }]);
+  const updated = unsetKeybinding(text, 'Terminal.ClosePane');
+  const out = JSON.parse(updated);
+  assert.ok(!out.keybindings.some((k) => k.id === 'Terminal.ClosePane'), '오버라이드가 제거되어야 한다');
+  assert.ok(out.keybindings.some((k) => k.id === null && k.keys === 'ctrl+shift+w'), '기본 키가 unbind되어야 한다');
+  const close = getKeybindings(updated).find((s) => s.id === 'Terminal.ClosePane');
+  assert.strictEqual(close.currentKeys, null);
+});
+
+test('unsetKeybinding: 기본 키가 없는 단축키는 오버라이드만 제거하고 unbind 항목을 만들지 않는다', () => {
+  const text = settings([{ id: 'Terminal.SwapPaneLeft', keys: 'ctrl+alt+left' }]);
+  const out = JSON.parse(unsetKeybinding(text, 'Terminal.SwapPaneLeft'));
+  assert.ok(!out.keybindings.some((k) => k.id === 'Terminal.SwapPaneLeft'));
+  assert.ok(!out.keybindings.some((k) => k.id === null));
+});
+
+test('unsetKeybinding을 두 번 해도 unbind 항목이 중복되지 않는다', () => {
+  const once = unsetKeybinding(settings([]), 'Terminal.ClosePane');
+  const twice = JSON.parse(unsetKeybinding(once, 'Terminal.ClosePane'));
+  const unbinds = twice.keybindings.filter((k) => k.id === null && k.keys === 'ctrl+shift+w');
+  assert.strictEqual(unbinds.length, 1);
+});
+
+test('unsetKeybinding: 기본 키를 다른 명령이 쓰고 있으면 unbind 항목을 추가하지 않는다', () => {
+  // 사용자가 alt+shift+d(DuplicatePaneAuto 기본 키)를 SplitPaneRight로 재할당해 둔 상황
+  const text = settings([{ id: 'Terminal.SplitPaneRight', keys: 'alt+shift+d' }]);
+  const out = JSON.parse(unsetKeybinding(text, 'Terminal.DuplicatePaneAuto'));
+  assert.ok(out.keybindings.some((k) => k.id === 'Terminal.SplitPaneRight' && k.keys === 'alt+shift+d'), '다른 명령의 바인딩은 유지된다');
+  assert.ok(!out.keybindings.some((k) => k.id === null && k.keys === 'alt+shift+d'), 'unbind 항목을 추가하면 그 명령까지 죽으므로 추가하지 않는다');
+});
+
+test('getKeybindings: 기본 키가 unbind되어 있고 오버라이드가 없으면 currentKeys는 null이다', () => {
+  const text = settings([{ id: null, keys: 'ctrl+shift+w' }]);
+  const close = getKeybindings(text).find((s) => s.id === 'Terminal.ClosePane');
+  assert.strictEqual(close.currentKeys, null);
+});
+
+test('getKeybindings: 기본 키를 다른 명령이 가져갔으면 currentKeys는 null이다', () => {
+  const text = settings([{ id: 'Terminal.SplitPaneRight', keys: 'alt+shift+d' }]);
+  const dup = getKeybindings(text).find((s) => s.id === 'Terminal.DuplicatePaneAuto');
+  assert.strictEqual(dup.currentKeys, null, '기본 키 alt+shift+d가 SplitPaneRight에 재할당됐으므로 등록 안 됨');
 });
 
 test('기본 키로 되돌리면 unbind 항목 없이 오버라이드만 정리된다', () => {

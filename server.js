@@ -5,7 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawn, spawnSync } = require('node:child_process');
 const { scanSessions } = require('./lib/scan-sessions');
-const { getKeybindings, setKeybinding } = require('./lib/wt-keybindings');
+const { getKeybindings, setKeybinding, unsetKeybinding } = require('./lib/wt-keybindings');
 const { trashSessions } = require('./lib/trash-sessions');
 const { parseSession, extractUserPrompts, extractConversation } = require('./lib/parse-session');
 const { buildHandoffMd } = require('./lib/handoff');
@@ -121,7 +121,8 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       const { id, keys } = body || {};
-      if (!id || !keys || !/^[a-z0-9+,\-=]+$/i.test(keys)) {
+      // keys가 null이면 "등록 안 함"(해제) 요청이다
+      if (!id || (keys !== null && (!keys || !/^[a-z0-9+,\-=]+$/i.test(keys)))) {
         sendJson(res, 400, { error: '단축키 형식이 올바르지 않습니다.' });
         return;
       }
@@ -133,7 +134,7 @@ const server = http.createServer(async (req, res) => {
       const original = fs.readFileSync(settingsPath, 'utf8');
       let updated;
       try {
-        updated = setKeybinding(original, id, keys);
+        updated = keys === null ? unsetKeybinding(original, id) : setKeybinding(original, id, keys);
       } catch (err) {
         sendJson(res, 400, { error: err.message });
         return;
