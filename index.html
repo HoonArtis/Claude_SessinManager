@@ -17,6 +17,7 @@
   .ver.behind { color: var(--token); background: var(--token-soft); padding: 2px 8px; border-radius: 9px; font-weight: 600; }
   #verUpdateBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--token); border-radius: 8px; background: var(--token-soft); font-size: 13px; color: var(--token); font-weight: 600; cursor: pointer; }
   #verUpdateBtn:hover { background: var(--token); color: #fff; }
+  #verUpdateBtn[hidden] { display: none; } /* display:flex가 hidden 속성을 덮어쓰지 않게 */
   .title-edit { display: flex; gap: 6px; flex: 1; }
   .title-edit input { flex: 1; padding: 8px 10px; border: 1px solid var(--accent); border-radius: 8px; font-size: 14px; background: var(--bg); color: var(--text); }
   .title-edit button { min-height: 38px; padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1px solid var(--border); background: var(--bg); color: var(--text); }
