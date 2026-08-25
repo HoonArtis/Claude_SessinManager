@@ -143,7 +143,7 @@
 </style>
 <header>
   <h1>Claude 세션 매니저</h1>
-  <span id="ver" class="ver" title="실행 중인 버전"></span>
+  <span id="ver" class="ver" title="실행 중인 버전">최신 확인 중...</span>
   <input id="search" type="search" placeholder="제목·프롬프트 검색..." aria-label="세션 제목과 프롬프트 검색">
   <label><input id="showEmpty" type="checkbox"> 빈 세션 표시</label>
   <button id="kbBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></svg> 터미널 단축키</button>
@@ -870,14 +870,14 @@ new EventSource('/api/alive');
 // 실행 중인 버전 표시 — 원격에 새 커밋이 있으면 배지로 알림 (받기는 바로가기 재실행이 담당)
 fetch('/api/version').then((r) => r.json()).then((v) => {
   const $v = document.getElementById('ver');
-  if (!v.commit) return;
+  if (!v.commit) { $v.textContent = ''; return; }
   if (v.behind > 0) {
     $v.textContent = `${v.commit} · 업데이트 ${v.behind}건 — 바로가기로 다시 실행하면 적용`;
     $v.classList.add('behind');
   } else {
     $v.textContent = `${v.commit} · 최신`;
   }
-}).catch(() => {});
+}).catch(() => { document.getElementById('ver').textContent = ''; });
 
 load();
 </script>
