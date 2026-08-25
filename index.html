@@ -939,10 +939,12 @@ function checkVersion() {
     const $btn = document.getElementById('verUpdateBtn');
     if (!v.commit) { $v.textContent = ''; return; }
     if (v.behind > 0) {
+      // 깃허브에 새 커밋이 있음 — 받을지 물어본다
       $v.textContent = `${v.commit} · 업데이트 ${v.behind}건`;
       $v.classList.add('behind');
       const snoozedUntil = parseInt(localStorage.getItem(SNOOZE_KEY) || '0', 10);
       if (Date.now() < snoozedUntil) {
+        $btn.textContent = '버전 업데이트하기';
         $btn.hidden = false;
       } else if (!updateModalShown) {
         updateModalShown = true;
@@ -950,6 +952,12 @@ function checkVersion() {
         document.getElementById('updOverlay').style.display = 'flex';
         document.getElementById('updLater').focus();
       }
+    } else if (v.restart > 0) {
+      // 코드는 이미 최신인데 실행 중인 서버만 구버전 — 재시작만 하면 된다 (모달 없이 버튼만)
+      $v.textContent = `${v.commit} 실행 중 · 새 코드 대기`;
+      $v.classList.add('behind');
+      $btn.textContent = '새 버전 적용 (재시작)';
+      $btn.hidden = false;
     } else {
       $v.textContent = `${v.commit} · 최신`;
       $v.classList.remove('behind');

@@ -158,15 +158,17 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.method === 'GET' && req.url === '/api/version') {
-      // "지금 실행 중인 코드"(부팅 시점 커밋) 기준으로 원격에 밀린 커밋 수를 계산한다.
-      // launch.vbs가 백그라운드 pull로 HEAD를 먼저 올려놔도 재실행 전까지는 업데이트로 표시된다.
+      // behind  = 원격에만 있는 커밋 수 (받아야 함 → 업데이트 모달)
+      // restart = 디스크에는 있는데 실행 중인 프로세스에 반영 안 된 커밋 수 (재시작만 하면 됨)
       const opts = { cwd: __dirname, windowsHide: true, encoding: 'utf8' };
-      const behind = BOOT_COMMIT
-        ? spawnSync('git', ['rev-list', '--count', `${BOOT_COMMIT}..origin/master`], opts)
-        : null;
+      const count = (range) => {
+        const r = spawnSync('git', ['rev-list', '--count', range], opts);
+        return r.status === 0 ? parseInt(r.stdout.trim(), 10) || 0 : 0;
+      };
       sendJson(res, 200, {
         commit: BOOT_COMMIT,
-        behind: behind && behind.status === 0 ? parseInt(behind.stdout.trim(), 10) || 0 : 0,
+        behind: count('HEAD..origin/master'),
+        restart: BOOT_COMMIT ? count(`${BOOT_COMMIT}..HEAD`) : 0,
       });
       return;
     }
