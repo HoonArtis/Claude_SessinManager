@@ -135,6 +135,23 @@
   .heavy-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 600; color: var(--accent-deep); background: var(--accent-soft); border-radius: 5px; padding: 2px 6px; margin-right: 6px; vertical-align: 1px; }
   .heavy-badge .icon { width: 12px; height: 12px; }
   #empty-msg { color: var(--muted); text-align: center; margin-top: 40px; }
+  #newSessionBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--accent); border-radius: 8px; background: var(--accent); color: #fff; font-size: 15px; cursor: pointer; }
+  #newSessionBtn:hover { background: #b55536; border-color: #b55536; }
+  .hdr-sep { width: 1px; align-self: stretch; margin: 4px 4px; background: var(--border); }
+  #nsOverlay { display: none; position: fixed; inset: 0; background: rgba(28,33,40,.4); z-index: 10; }
+  #nsOverlay.open { display: flex; align-items: center; justify-content: center; }
+  #nsPanel { background: var(--panel); border-radius: 12px; padding: 24px; width: 460px; max-width: calc(100vw - 24px); box-shadow: 0 12px 32px rgba(28,33,40,.18); }
+  #nsPanel h2 { font-size: 19px; margin: 0 0 6px; }
+  #nsHint { font-size: 13px; color: var(--muted); margin: 0 0 16px; line-height: 1.5; }
+  #nsFolderRow { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+  #nsFolder { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #nsPanel .ns-btn { min-height: 38px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
+  #nsPanel .ns-btn:hover { border-color: var(--accent); color: var(--accent); }
+  #nsClaudeRow { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 20px; }
+  #nsActions { display: flex; gap: 8px; }
+  #nsOpen { flex: 1; min-height: 44px; background: var(--accent); color: #fff; border: 0; border-radius: 8px; font-size: 15px; cursor: pointer; }
+  #nsCancel { min-height: 44px; padding: 0 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 15px; color: var(--text); cursor: pointer; }
+  #nsMsg { min-height: 18px; margin-top: 12px; font-size: 13px; color: var(--muted); }
   #kbOverlay { display: none; position: fixed; inset: 0; background: rgba(28,33,40,.4); z-index: 10; }
   #kbOverlay.open { display: flex; align-items: center; justify-content: center; }
   #kbModal { background: var(--panel); border-radius: 12px; padding: 24px; width: 760px; max-width: calc(100vw - 24px); max-height: 85dvh; overflow-y: auto; box-shadow: 0 12px 32px rgba(28,33,40,.18); }
@@ -181,6 +198,8 @@
   <span id="remoteBadge" hidden></span>
   <input id="search" type="search" placeholder="제목·프롬프트 검색..." aria-label="세션 제목과 프롬프트 검색">
   <label><input id="showEmpty" type="checkbox"> 빈 세션 표시</label>
+  <button id="newSessionBtn" class="primary"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> 새 세션</button>
+  <span class="hdr-sep" aria-hidden="true"></span>
   <button id="kbBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M18 14h.01M9 14h6"/></svg> 터미널 단축키</button>
   <button id="multiBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg> 동시 열기</button>
   <button id="delBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> 삭제</button>
@@ -269,6 +288,23 @@
       <button id="kbWarnYes" style="flex:1; min-height:44px; background:var(--danger); color:#fff; border:0; border-radius:8px; font-size:15px; cursor:pointer;">그래도 수정</button>
       <button id="kbWarnNo" style="flex:1; min-height:44px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:15px; cursor:pointer;">취소</button>
     </div>
+  </div>
+</div>
+<div id="nsOverlay">
+  <div id="nsPanel" role="dialog" aria-modal="true" aria-labelledby="nsTitle">
+    <h2 id="nsTitle">새 세션 시작</h2>
+    <p id="nsHint">📍 <strong>여기서 AI가 작업합니다.</strong> 폴더를 정해두면 claude가 그 자리에서 바로 시작해요 — "어디서 작업할까요" 왕복 없이 첫 프롬프트부터 본론으로.</p>
+    <div id="nsFolderRow">
+      <span id="nsFolder" title=""></span>
+      <button type="button" class="ns-btn" id="nsPick">폴더 선택…</button>
+      <button type="button" class="ns-btn" id="nsSetDefault">기본으로 설정</button>
+    </div>
+    <label id="nsClaudeRow"><input type="checkbox" id="nsClaude"> claude 자동 실행</label>
+    <div id="nsActions">
+      <button id="nsOpen">열기</button>
+      <button id="nsCancel">취소</button>
+    </div>
+    <div id="nsMsg" role="status" aria-live="polite"></div>
   </div>
 </div>
 <div id="kbOverlay">
@@ -850,6 +886,76 @@ function getOpenMode() {
   const m = localStorage.getItem('csm-open-mode');
   return ['window', 'tab', 'split-right', 'split-down'].includes(m) ? m : 'tab';
 }
+
+// ---- 새 세션 패널 ----
+const $nsOverlay = document.getElementById('nsOverlay');
+const $nsFolder = document.getElementById('nsFolder');
+const $nsClaude = document.getElementById('nsClaude');
+
+function nsMsg(text) { document.getElementById('nsMsg').textContent = text || ''; }
+
+function setNsFolder(path) {
+  $nsFolder.textContent = path || '';
+  $nsFolder.title = path || '';
+}
+
+async function openNewSession() {
+  // 체크박스 상태 복원(기본 체크)
+  $nsClaude.checked = localStorage.getItem('csm-new-claude') !== '0';
+  nsMsg('');
+  // 기본 폴더 로드
+  setNsFolder('불러오는 중…');
+  try {
+    const r = await fetch('/api/new-session-default');
+    const b = await r.json();
+    setNsFolder(b.folder || '');
+  } catch { setNsFolder(''); }
+  $nsOverlay.classList.add('open');
+}
+
+function closeNewSession() { $nsOverlay.classList.remove('open'); }
+
+document.getElementById('newSessionBtn').onclick = openNewSession;
+document.getElementById('nsCancel').onclick = closeNewSession;
+$nsOverlay.onclick = (e) => { if (e.target === $nsOverlay) closeNewSession(); };
+
+$nsClaude.onchange = () => localStorage.setItem('csm-new-claude', $nsClaude.checked ? '1' : '0');
+
+document.getElementById('nsPick').onclick = async () => {
+  try {
+    const r = await fetch('/api/pick-folder', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seed: $nsFolder.textContent }),
+    });
+    const b = await r.json();
+    if (b.path) setNsFolder(b.path); // 이번 한 번만 적용(기본값은 안 바뀜)
+  } catch (err) { nsMsg('실패: ' + err.message); }
+};
+
+document.getElementById('nsSetDefault').onclick = async () => {
+  const folder = $nsFolder.textContent;
+  try {
+    const r = await fetch('/api/new-session-default', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folder }),
+    });
+    const b = await r.json();
+    nsMsg(r.ok ? '기본 폴더로 저장했습니다.' : '실패: ' + b.error);
+  } catch (err) { nsMsg('실패: ' + err.message); }
+};
+
+document.getElementById('nsOpen').onclick = async () => {
+  const cwd = $nsFolder.textContent;
+  try {
+    const r = await fetch('/api/new-session', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd, claude: $nsClaude.checked, mode: getOpenMode() }),
+    });
+    const b = await r.json();
+    if (r.ok) { nsMsg('새 세션 터미널을 열었습니다.'); closeNewSession(); }
+    else { nsMsg('실패: ' + b.error); }
+  } catch (err) { nsMsg('실패: ' + err.message); }
+};
 
 async function callApi(url, s, okMsg) {
   const $status = document.getElementById('status');
