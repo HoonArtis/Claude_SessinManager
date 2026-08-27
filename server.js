@@ -233,50 +233,64 @@ function saveDefaultFolder(folder) {
 // 네이티브 폴더 선택창(PowerShell)을 띄우고 고른 경로를 resolve. 취소 시 null.
 // 서버(백그라운드)에서 띄운 다이얼로그는 브라우저 뒤로 숨을 수 있어, TopMost
 // 소유자 폼을 만들어 다이얼로그를 최상단으로 끌어온다.
+// 현재 열려 있는 폴더 선택창 하나(재클릭 시 이전 것을 닫고 새로 연다).
+let activePick = null;
+
 function pickFolderDialog(seed) {
   return new Promise((resolve) => {
-    // 상주 http 서버(백그라운드)가 직접 spawn한 powershell은 부모의 숨김 상태를
-    // 물려받거나 포그라운드 권한이 없어 다이얼로그가 화면에 안 뜬다.
-    // → 앱이 이미 쓰는 방식(launch.vbs)처럼 wscript로 powershell을 "최상위 독립
-    //   프로세스"로 띄우고, 선택 결과는 임시 파일로 주고받는다(이벤트루프도 안 막힘).
+    // 이미 열린 선택창이 있으면 그 프로세스를 종료(창 닫힘)하고 새로 연다.
+    if (activePick) { try { activePick.cancel(); } catch {} }
+
+    // 상주 http 서버(백그라운드)가 직접 spawn한 powershell은 숨김 상태 상속/포그라운드
+    // 권한 문제로 다이얼로그가 화면에 안 뜬다. → 앱이 쓰는 방식(launch.vbs)처럼 wscript로
+    // powershell을 최상위 독립 프로세스로 띄우고, 결과는 임시 파일로 주고받는다.
+    // 모던 탐색기형 창(IFileOpenDialog)은 lib/pick-folder.ps1이 담당한다.
     const id = crypto.randomBytes(6).toString('hex');
     const dir = os.tmpdir();
     const outPath = path.join(dir, `csm-pick-${id}.txt`);
-    const ps1Path = path.join(dir, `csm-pick-${id}.ps1`);
+    const pidPath = path.join(dir, `csm-pick-${id}.pid`);
     const vbsPath = path.join(dir, `csm-pick-${id}.vbs`);
-    const seedLit = String(seed || '').replace(/'/g, "''");
-    const outLit = outPath.replace(/'/g, "''");
-    const ps1 = [
-      'Add-Type -AssemblyName System.Windows.Forms',
-      '$owner = New-Object System.Windows.Forms.Form -Property @{TopMost=$true}',
-      '$d = New-Object System.Windows.Forms.FolderBrowserDialog',
-      '$d.ShowNewFolderButton = $true',
-      `try { $d.SelectedPath = '${seedLit}' } catch {}`,
-      '$r = $d.ShowDialog($owner)',
-      "$p = if ($r -eq [System.Windows.Forms.DialogResult]::OK) { $d.SelectedPath } else { '' }",
-      `[System.IO.File]::WriteAllText('${outLit}', [string]$p)`,
-    ].join('\r\n');
+    const ps1 = path.join(__dirname, 'lib', 'pick-folder.ps1');
+    const q = (s) => String(s || '').replace(/"/g, '');
     const vbs = 'Set sh = CreateObject("WScript.Shell")\r\n'
-      + `sh.Run "powershell -STA -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""${ps1Path}""", 0, False\r\n`;
-    const cleanup = () => { for (const f of [outPath, ps1Path, vbsPath]) { try { fs.unlinkSync(f); } catch {} } };
-    try {
-      fs.writeFileSync(ps1Path, ps1, 'utf8');
-      fs.writeFileSync(vbsPath, vbs, 'utf8');
-    } catch { resolve(null); return; }
+      + `sh.Run "powershell -STA -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""${ps1}"" -Seed ""${q(seed)}"" -Out ""${outPath}"" -PidFile ""${pidPath}""", 0, False\r\n`;
+    const cleanup = () => { for (const f of [outPath, pidPath, vbsPath]) { try { fs.unlinkSync(f); } catch {} } };
+
+    const ctrl = { pid: null, timer: null, settled: false };
+    const finish = (val) => {
+      if (ctrl.settled) return;
+      ctrl.settled = true;
+      clearInterval(ctrl.timer);
+      cleanup();
+      if (activePick === ctrl) activePick = null;
+      resolve(val);
+    };
+    ctrl.cancel = () => {
+      if (ctrl.settled) return;
+      if (ctrl.pid) { try { spawnSync('taskkill', ['/F', '/PID', String(ctrl.pid)], { windowsHide: true }); } catch {} }
+      finish(null);
+    };
+    activePick = ctrl;
+
+    try { fs.writeFileSync(vbsPath, vbs, 'utf8'); }
+    catch { finish(null); return; }
     const child = spawn('wscript', [vbsPath], { detached: true, stdio: 'ignore', windowsHide: false });
-    child.on('error', () => { cleanup(); resolve(null); });
+    child.on('error', () => finish(null));
     child.unref();
-    // 결과 파일이 생길 때까지 폴링(최대 3분). 파일 내용이 비면 취소로 간주.
+
+    // PID 파악 + 결과 파일 폴링(최대 3분). 결과 내용이 비면 취소로 간주.
     const startMs = Date.now();
-    const timer = setInterval(() => {
-      let done = false, val = null;
-      if (fs.existsSync(outPath)) {
-        done = true;
-        try { val = fs.readFileSync(outPath, 'utf8').trim() || null; } catch {}
-      } else if (Date.now() - startMs > 180000) {
-        done = true;
+    ctrl.timer = setInterval(() => {
+      if (!ctrl.pid && fs.existsSync(pidPath)) {
+        try { ctrl.pid = parseInt(fs.readFileSync(pidPath, 'utf8').trim(), 10) || null; } catch {}
       }
-      if (done) { clearInterval(timer); cleanup(); resolve(val); }
+      if (fs.existsSync(outPath)) {
+        let val = null;
+        try { val = fs.readFileSync(outPath, 'utf8').trim() || null; } catch {}
+        finish(val);
+      } else if (Date.now() - startMs > 180000) {
+        finish(null);
+      }
     }, 250);
   });
 }
