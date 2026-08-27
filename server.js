@@ -236,18 +236,17 @@ function saveDefaultFolder(folder) {
 function pickFolderDialog(seed) {
   return new Promise((resolve) => {
     const safeSeed = String(seed || '').replace(/'/g, "''");
+    // TopMost 속성만 준 소유자 폼을 ShowDialog에 넘기면 다이얼로그가 최상단으로 뜬다.
+    // (폼을 .Show()/.Activate() 하면 오히려 즉시 취소되므로 표시하지 않는다.)
     const script =
       'Add-Type -AssemblyName System.Windows.Forms;' +
-      '$f = New-Object System.Windows.Forms.Form;' +
-      '$f.TopMost=$true; $f.ShowInTaskbar=$false; $f.StartPosition=\'Manual\'; $f.Left=-3000; $f.Top=-3000; $f.Width=1; $f.Height=1;' +
-      '$f.Show(); $f.Activate(); [System.Windows.Forms.Application]::DoEvents();' +
+      '$owner = New-Object System.Windows.Forms.Form -Property @{TopMost=$true};' +
       '$d = New-Object System.Windows.Forms.FolderBrowserDialog;' +
       '$d.ShowNewFolderButton = $true;' +
       "try { $d.SelectedPath = '" + safeSeed + "' } catch {};" +
-      '$r = $d.ShowDialog($f);' +
-      '$f.Close();' +
+      '$r = $d.ShowDialog($owner);' +
       'if ($r -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.SelectedPath) }';
-    const ps = spawn('powershell', ['-STA', '-NoProfile', '-NonInteractive', '-Command', script],
+    const ps = spawn('powershell', ['-STA', '-NoProfile', '-Command', script],
       { windowsHide: true });
     let out = '';
     ps.stdout.on('data', (d) => { out += d; });
