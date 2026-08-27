@@ -9,6 +9,7 @@ const { spawn, spawnSync } = require('node:child_process');
 const { scanSessions } = require('./lib/scan-sessions');
 const { getKeybindings, setKeybinding, unsetKeybinding } = require('./lib/wt-keybindings');
 const { trashSessions } = require('./lib/trash-sessions');
+const { buildLaunchArgs, readDefaultFolder, withDefaultFolder } = require('./lib/new-session');
 const { parseSession, extractUserPrompts, extractConversation, extractConversationFull } = require('./lib/parse-session');
 const { buildHandoffMd } = require('./lib/handoff');
 
@@ -182,30 +183,11 @@ function wtSettingsPath() {
   return WT_SETTINGS_CANDIDATES.find((p) => fs.existsSync(p)) || null;
 }
 
-// 열기 방식: window(새 창) / tab(기존 창 새 탭) / split-right(오른쪽 분할) / split-down(아래 분할)
-const OPEN_MODES = {
-  window: ['-w', 'new', 'nt'],
-  tab: ['-w', '0', 'nt'],
-  'split-right': ['-w', '0', 'sp', '-V'],
-  'split-down': ['-w', '0', 'sp', '-H'],
-};
-
-function normalizeMode(mode) {
-  return OPEN_MODES[mode] ? mode : 'tab';
-}
-
-function launchInTerminal(cwd, claudeCmd, mode) {
-  let child;
-  if (hasWt) {
-    const openArgs = OPEN_MODES[normalizeMode(mode)];
-    child = spawn('wt', [...openArgs, '-d', cwd, 'cmd', '/k', claudeCmd], { detached: true, stdio: 'ignore', env: CLEAN_ENV });
-  } else {
-    child = spawn('cmd', ['/c', 'start', '"claude"', 'cmd', '/k', `cd /d "${cwd}" && ${claudeCmd}`], {
-      detached: true,
-      stdio: 'ignore',
-      shell: false,
-    });
-  }
+// 열기 방식(window/tab/split-right/split-down)과 런치 인자는 lib/new-session이 단일 출처.
+// command가 falsy면 그 폴더에서 셸만 연다(claude 없이).
+function launchInTerminal(cwd, command, mode) {
+  const { cmd, args } = buildLaunchArgs({ cwd, command, mode, hasWt });
+  const child = spawn(cmd, args, { detached: true, stdio: 'ignore', env: CLEAN_ENV });
   child.unref();
 }
 
