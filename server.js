@@ -213,6 +213,23 @@ function validCwd(res, cwd) {
   return true;
 }
 
+// config.json을 디스크에서 새로 읽는다(인메모리 CONFIG는 시작 시점 값이라 최신이 아닐 수 있음).
+function loadConfigFresh() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+// 기본 폴더를 config.json에 머지 저장(원격 키 보존, 쓰기 전 백업).
+function saveDefaultFolder(folder) {
+  const p = path.join(__dirname, 'config.json');
+  const cfg = loadConfigFresh();
+  if (fs.existsSync(p)) fs.copyFileSync(p, p + '.csm-backup');
+  fs.writeFileSync(p, JSON.stringify(withDefaultFolder(cfg, folder), null, 2));
+}
+
 // --- 브라우저 탭이 모두 닫히면 서버 자동 종료 ---
 // 페이지가 SSE(/api/alive)로 연결을 유지한다. 연결 수가 0이 되면 GRACE_MS 뒤 종료
 // (새로고침·재접속 여유). 시작 후 아무도 접속하지 않으면 BOOT_GRACE_MS 뒤 종료.
@@ -800,6 +817,22 @@ const server = http.createServer(async (req, res) => {
       }
       sendJson(res, 200, trashSessions(PROJECTS_DIR, items));
       return;
+    }
+    if (req.url === '/api/new-session-default') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      if (req.method === 'GET') {
+        sendJson(res, 200, { folder: readDefaultFolder(loadConfigFresh()) });
+        return;
+      }
+      if (req.method === 'POST') {
+        let body;
+        try { body = JSON.parse(await readBody(req)); } catch { sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' }); return; }
+        const folder = body && body.folder;
+        if (!validCwd(res, folder)) return;
+        saveDefaultFolder(folder);
+        sendJson(res, 200, { ok: true, folder });
+        return;
+      }
     }
     if (req.method === 'POST' && (req.url === '/api/resume' || req.url === '/api/open-folder')) {
       let body;
