@@ -230,6 +230,25 @@ function saveDefaultFolder(folder) {
   fs.writeFileSync(p, JSON.stringify(withDefaultFolder(cfg, folder), null, 2));
 }
 
+// 네이티브 폴더 선택창(PowerShell)을 띄우고 고른 경로를 resolve. 취소 시 null.
+function pickFolderDialog(seed) {
+  return new Promise((resolve) => {
+    const safeSeed = String(seed || '').replace(/'/g, "''");
+    const script =
+      'Add-Type -AssemblyName System.Windows.Forms;' +
+      '$d = New-Object System.Windows.Forms.FolderBrowserDialog;' +
+      '$d.ShowNewFolderButton = $true;' +
+      "try { $d.SelectedPath = '" + safeSeed + "' } catch {};" +
+      'if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.SelectedPath) }';
+    const ps = spawn('powershell', ['-STA', '-NoProfile', '-NonInteractive', '-Command', script],
+      { windowsHide: true });
+    let out = '';
+    ps.stdout.on('data', (d) => { out += d; });
+    ps.on('error', () => resolve(null));
+    ps.on('close', () => resolve(out.trim() || null));
+  });
+}
+
 // --- 브라우저 탭이 모두 닫히면 서버 자동 종료 ---
 // 페이지가 SSE(/api/alive)로 연결을 유지한다. 연결 수가 0이 되면 GRACE_MS 뒤 종료
 // (새로고침·재접속 여유). 시작 후 아무도 접속하지 않으면 BOOT_GRACE_MS 뒤 종료.
@@ -833,6 +852,16 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 200, { ok: true, folder });
         return;
       }
+    }
+    if (req.method === 'POST' && req.url === '/api/pick-folder') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      let body = {};
+      try { body = JSON.parse(await readBody(req)); } catch {}
+      const seed = (body && body.seed) || readDefaultFolder(loadConfigFresh());
+      const picked = await pickFolderDialog(seed);
+      if (!picked) { sendJson(res, 200, { cancelled: true }); return; }
+      sendJson(res, 200, { path: picked });
+      return;
     }
     if (req.method === 'POST' && (req.url === '/api/resume' || req.url === '/api/open-folder')) {
       let body;
