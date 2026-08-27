@@ -231,15 +231,22 @@ function saveDefaultFolder(folder) {
 }
 
 // 네이티브 폴더 선택창(PowerShell)을 띄우고 고른 경로를 resolve. 취소 시 null.
+// 서버(백그라운드)에서 띄운 다이얼로그는 브라우저 뒤로 숨을 수 있어, TopMost
+// 소유자 폼을 만들어 다이얼로그를 최상단으로 끌어온다.
 function pickFolderDialog(seed) {
   return new Promise((resolve) => {
     const safeSeed = String(seed || '').replace(/'/g, "''");
     const script =
       'Add-Type -AssemblyName System.Windows.Forms;' +
+      '$f = New-Object System.Windows.Forms.Form;' +
+      '$f.TopMost=$true; $f.ShowInTaskbar=$false; $f.StartPosition=\'Manual\'; $f.Left=-3000; $f.Top=-3000; $f.Width=1; $f.Height=1;' +
+      '$f.Show(); $f.Activate(); [System.Windows.Forms.Application]::DoEvents();' +
       '$d = New-Object System.Windows.Forms.FolderBrowserDialog;' +
       '$d.ShowNewFolderButton = $true;' +
       "try { $d.SelectedPath = '" + safeSeed + "' } catch {};" +
-      'if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.SelectedPath) }';
+      '$r = $d.ShowDialog($f);' +
+      '$f.Close();' +
+      'if ($r -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.SelectedPath) }';
     const ps = spawn('powershell', ['-STA', '-NoProfile', '-NonInteractive', '-Command', script],
       { windowsHide: true });
     let out = '';
