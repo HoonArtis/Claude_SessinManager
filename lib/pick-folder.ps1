@@ -71,13 +71,15 @@ namespace CsmPicker {
 "@
 Add-Type -TypeDefinition $cs
 
-# 커서가 있는 모니터 중앙에 투명 소유자 창을 두어, 다이얼로그가 그 화면에 최상단으로 뜨게 한다.
+# 커서가 있는 모니터에 투명 소유자 창을 "다이얼로그 크기만큼" 만들어 화면 중앙에 둔다.
+# 다이얼로그는 소유자 창 위에 중앙 정렬되므로 화면 중앙에 뜬다.
 $scr = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position)
+$w = 720; $h = 560
 $owner = New-Object System.Windows.Forms.Form
 $owner.TopMost = $true; $owner.ShowInTaskbar = $false; $owner.FormBorderStyle = 'None'; $owner.Opacity = 0
-$owner.StartPosition = 'Manual'; $owner.Width = 1; $owner.Height = 1
-$owner.Left = $scr.Bounds.X + [int]($scr.Bounds.Width / 2)
-$owner.Top  = $scr.Bounds.Y + [int]($scr.Bounds.Height / 2)
+$owner.StartPosition = 'Manual'; $owner.Width = $w; $owner.Height = $h
+$owner.Left = $scr.Bounds.X + [int](($scr.Bounds.Width - $w) / 2)
+$owner.Top  = $scr.Bounds.Y + [int](($scr.Bounds.Height - $h) / 2)
 $owner.Show(); $owner.Activate()
 try { $sel = [CsmPicker.FolderPicker]::Show($Seed, $owner.Handle) } catch { $sel = $null }
 $owner.Close()
