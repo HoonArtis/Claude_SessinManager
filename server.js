@@ -863,6 +863,16 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, { path: picked });
       return;
     }
+    if (req.method === 'POST' && req.url === '/api/new-session') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      let body;
+      try { body = JSON.parse(await readBody(req)); } catch { sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' }); return; }
+      const { cwd, claude, mode } = body || {};
+      if (!validCwd(res, cwd)) return;
+      launchInTerminal(cwd, claude ? 'claude' : null, mode);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
     if (req.method === 'POST' && (req.url === '/api/resume' || req.url === '/api/open-folder')) {
       let body;
       try {
