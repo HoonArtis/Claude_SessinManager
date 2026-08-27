@@ -246,8 +246,11 @@ function pickFolderDialog(seed) {
       "try { $d.SelectedPath = '" + safeSeed + "' } catch {};" +
       '$r = $d.ShowDialog($owner);' +
       'if ($r -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.SelectedPath) }';
-    const ps = spawn('powershell', ['-STA', '-NoProfile', '-Command', script],
-      { windowsHide: true });
+    // 서버는 wscript가 node를 숨김으로 띄우므로, windowsHide:true면 다이얼로그 창까지
+    // 숨김 상태를 물려받아 화면에 안 뜬다. -WindowStyle Hidden으로 콘솔만 숨기고
+    // windowsHide:false로 GUI(다이얼로그)는 정상 표시되게 한다.
+    const ps = spawn('powershell', ['-STA', '-NoProfile', '-WindowStyle', 'Hidden', '-Command', script],
+      { windowsHide: false });
     let out = '';
     ps.stdout.on('data', (d) => { out += d; });
     ps.on('error', () => resolve(null));
