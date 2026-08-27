@@ -296,7 +296,7 @@
     <h2 id="nsTitle">새 세션 시작</h2>
     <p id="nsHint">📍 <strong>여기서 AI가 작업합니다.</strong> 폴더를 정해두면 claude가 그 자리에서 바로 시작해요 — "어디서 작업할까요" 왕복 없이 첫 프롬프트부터 본론으로.</p>
     <div id="nsFolderRow">
-      <span id="nsFolder" title=""></span>
+      <input id="nsFolder" type="text" spellcheck="false" placeholder="폴더 경로 (직접 입력·붙여넣기 가능)" title="">
       <button type="button" class="ns-btn" id="nsPick">폴더 선택…</button>
       <button type="button" class="ns-btn" id="nsSetDefault">기본으로 설정</button>
     </div>
@@ -896,7 +896,7 @@ const $nsClaude = document.getElementById('nsClaude');
 function nsMsg(text) { document.getElementById('nsMsg').textContent = text || ''; }
 
 function setNsFolder(path) {
-  $nsFolder.textContent = path || '';
+  $nsFolder.value = path || '';
   $nsFolder.title = path || '';
 }
 
@@ -926,7 +926,7 @@ document.getElementById('nsPick').onclick = async () => {
   try {
     const r = await fetch('/api/pick-folder', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seed: $nsFolder.textContent }),
+      body: JSON.stringify({ seed: $nsFolder.value }),
     });
     const b = await r.json();
     if (b.path) setNsFolder(b.path); // 이번 한 번만 적용(기본값은 안 바뀜)
@@ -934,7 +934,7 @@ document.getElementById('nsPick').onclick = async () => {
 };
 
 document.getElementById('nsSetDefault').onclick = async () => {
-  const folder = $nsFolder.textContent;
+  const folder = $nsFolder.value;
   try {
     const r = await fetch('/api/new-session-default', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -946,7 +946,7 @@ document.getElementById('nsSetDefault').onclick = async () => {
 };
 
 document.getElementById('nsOpen').onclick = async () => {
-  const cwd = $nsFolder.textContent;
+  const cwd = $nsFolder.value;
   try {
     const r = await fetch('/api/new-session', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

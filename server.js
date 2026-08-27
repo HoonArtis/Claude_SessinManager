@@ -235,26 +235,49 @@ function saveDefaultFolder(folder) {
 // 소유자 폼을 만들어 다이얼로그를 최상단으로 끌어온다.
 function pickFolderDialog(seed) {
   return new Promise((resolve) => {
-    const safeSeed = String(seed || '').replace(/'/g, "''");
-    // TopMost 속성만 준 소유자 폼을 ShowDialog에 넘기면 다이얼로그가 최상단으로 뜬다.
-    // (폼을 .Show()/.Activate() 하면 오히려 즉시 취소되므로 표시하지 않는다.)
-    const script =
-      'Add-Type -AssemblyName System.Windows.Forms;' +
-      '$owner = New-Object System.Windows.Forms.Form -Property @{TopMost=$true};' +
-      '$d = New-Object System.Windows.Forms.FolderBrowserDialog;' +
-      '$d.ShowNewFolderButton = $true;' +
-      "try { $d.SelectedPath = '" + safeSeed + "' } catch {};" +
-      '$r = $d.ShowDialog($owner);' +
-      'if ($r -eq [System.Windows.Forms.DialogResult]::OK) { [Console]::Out.Write($d.SelectedPath) }';
-    // 서버는 wscript가 node를 숨김으로 띄우므로, windowsHide:true면 다이얼로그 창까지
-    // 숨김 상태를 물려받아 화면에 안 뜬다. -WindowStyle Hidden으로 콘솔만 숨기고
-    // windowsHide:false로 GUI(다이얼로그)는 정상 표시되게 한다.
-    const ps = spawn('powershell', ['-STA', '-NoProfile', '-WindowStyle', 'Hidden', '-Command', script],
-      { windowsHide: false });
-    let out = '';
-    ps.stdout.on('data', (d) => { out += d; });
-    ps.on('error', () => resolve(null));
-    ps.on('close', () => resolve(out.trim() || null));
+    // 상주 http 서버(백그라운드)가 직접 spawn한 powershell은 부모의 숨김 상태를
+    // 물려받거나 포그라운드 권한이 없어 다이얼로그가 화면에 안 뜬다.
+    // → 앱이 이미 쓰는 방식(launch.vbs)처럼 wscript로 powershell을 "최상위 독립
+    //   프로세스"로 띄우고, 선택 결과는 임시 파일로 주고받는다(이벤트루프도 안 막힘).
+    const id = crypto.randomBytes(6).toString('hex');
+    const dir = os.tmpdir();
+    const outPath = path.join(dir, `csm-pick-${id}.txt`);
+    const ps1Path = path.join(dir, `csm-pick-${id}.ps1`);
+    const vbsPath = path.join(dir, `csm-pick-${id}.vbs`);
+    const seedLit = String(seed || '').replace(/'/g, "''");
+    const outLit = outPath.replace(/'/g, "''");
+    const ps1 = [
+      'Add-Type -AssemblyName System.Windows.Forms',
+      '$owner = New-Object System.Windows.Forms.Form -Property @{TopMost=$true}',
+      '$d = New-Object System.Windows.Forms.FolderBrowserDialog',
+      '$d.ShowNewFolderButton = $true',
+      `try { $d.SelectedPath = '${seedLit}' } catch {}`,
+      '$r = $d.ShowDialog($owner)',
+      "$p = if ($r -eq [System.Windows.Forms.DialogResult]::OK) { $d.SelectedPath } else { '' }",
+      `[System.IO.File]::WriteAllText('${outLit}', [string]$p)`,
+    ].join('\r\n');
+    const vbs = 'Set sh = CreateObject("WScript.Shell")\r\n'
+      + `sh.Run "powershell -STA -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""${ps1Path}""", 0, False\r\n`;
+    const cleanup = () => { for (const f of [outPath, ps1Path, vbsPath]) { try { fs.unlinkSync(f); } catch {} } };
+    try {
+      fs.writeFileSync(ps1Path, ps1, 'utf8');
+      fs.writeFileSync(vbsPath, vbs, 'utf8');
+    } catch { resolve(null); return; }
+    const child = spawn('wscript', [vbsPath], { detached: true, stdio: 'ignore', windowsHide: false });
+    child.on('error', () => { cleanup(); resolve(null); });
+    child.unref();
+    // 결과 파일이 생길 때까지 폴링(최대 3분). 파일 내용이 비면 취소로 간주.
+    const startMs = Date.now();
+    const timer = setInterval(() => {
+      let done = false, val = null;
+      if (fs.existsSync(outPath)) {
+        done = true;
+        try { val = fs.readFileSync(outPath, 'utf8').trim() || null; } catch {}
+      } else if (Date.now() - startMs > 180000) {
+        done = true;
+      }
+      if (done) { clearInterval(timer); cleanup(); resolve(val); }
+    }, 250);
   });
 }
 
