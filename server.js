@@ -12,10 +12,11 @@ const { trashSessions } = require('./lib/trash-sessions');
 const { buildLaunchArgs, readDefaultFolder, withDefaultFolder } = require('./lib/new-session');
 const { parseSession, extractUserPrompts, extractConversation, extractConversationFull } = require('./lib/parse-session');
 const { buildHandoffMd } = require('./lib/handoff');
+const { loadCatalog, buildMcpAddArgs, buildHarnessPrompt, parseInstalledMcps, parseInstalledPlugins } = require('./lib/mcp-catalog');
 
 const SAFE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
 
-const PORT = 7777;
+const PORT = Number(process.env.CSM_PORT) || 7777;
 const DISCOVERY_PORT = 7778;
 const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 
@@ -203,6 +204,20 @@ function launchFreshClaude(cwd, mode) {
 function openFolder(cwd) {
   const child = spawn('explorer.exe', [cwd], { detached: true, stdio: 'ignore' });
   child.unref();
+}
+
+// 설치된 MCP/플러그인 이름을 CLI로 조회(실패해도 빈 배열).
+function detectInstalled() {
+  const result = { mcp: [], harness: [] };
+  try {
+    const r = spawnSync('claude', ['mcp', 'list'], { encoding: 'utf8', timeout: 20000, env: CLEAN_ENV });
+    if (r.stdout) result.mcp = [...parseInstalledMcps(r.stdout)];
+  } catch {}
+  try {
+    const r = spawnSync('claude', ['plugin', 'list'], { encoding: 'utf8', timeout: 20000, env: CLEAN_ENV });
+    if (r.stdout) result.harness = [...parseInstalledPlugins(r.stdout)];
+  } catch {}
+  return result;
 }
 
 function validCwd(res, cwd) {
@@ -943,6 +958,51 @@ const server = http.createServer(async (req, res) => {
       const chained = loadChains()[sessionId];
       launchResume(cwd, chained || sessionId, body.mode);
       sendJson(res, 200, { ok: true });
+      return;
+    }
+    if (req.method === 'GET' && req.url === '/api/catalog') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      const cat = loadCatalog(__dirname);
+      sendJson(res, 200, { ...cat, installed: detectInstalled() });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/mcp-install') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      let body;
+      try { body = JSON.parse(await readBody(req)); } catch { sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' }); return; }
+      const { items, scope, projectDir } = body || {};
+      if (!Array.isArray(items) || !items.length) { sendJson(res, 400, { error: '설치할 항목이 없습니다.' }); return; }
+      const useScope = scope === 'project' ? 'project' : 'user';
+      const cwd = useScope === 'project' ? projectDir : undefined;
+      if (useScope === 'project' && !validCwd(res, cwd)) return;
+      const cat = loadCatalog(__dirname);
+      const byId = new Map(cat.mcp.map((m) => [m.id, m]));
+      const results = [];
+      for (const it of items) {
+        const entry = byId.get(it && it.id);
+        if (!entry) { results.push({ id: it && it.id, ok: false, message: '카탈로그에 없는 항목' }); continue; }
+        const argv = buildMcpAddArgs(entry, { scope: useScope, envValues: it.envValues || {}, headerValues: it.headerValues || {} });
+        const r = spawnSync('claude', argv, { encoding: 'utf8', timeout: 120000, cwd, env: CLEAN_ENV });
+        const ok = r.status === 0;
+        const msg = ok ? '설치됨' : String((r.stderr || r.stdout || (r.error && r.error.message) || '실패')).trim().slice(0, 400);
+        results.push({ id: entry.id, ok, message: msg });
+      }
+      sendJson(res, 200, { results });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/harness-install') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      let body;
+      try { body = JSON.parse(await readBody(req)); } catch { sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' }); return; }
+      const { ids, mode } = body || {};
+      if (!Array.isArray(ids) || !ids.length) { sendJson(res, 400, { error: '설치할 하네스가 없습니다.' }); return; }
+      const cat = loadCatalog(__dirname);
+      const byId = new Map(cat.harness.map((h) => [h.id, h]));
+      const entries = ids.map((id) => byId.get(id)).filter(Boolean);
+      if (!entries.length) { sendJson(res, 400, { error: '카탈로그에 없는 하네스입니다.' }); return; }
+      const prompt = buildHarnessPrompt(entries).replace(/"/g, '\\"');
+      launchInTerminal(os.homedir(), `claude "${prompt}"`, mode);
+      sendJson(res, 200, { ok: true, launched: entries.map((e) => e.id) });
       return;
     }
     sendJson(res, 404, { error: 'not found' });
