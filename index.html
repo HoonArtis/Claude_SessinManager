@@ -32,6 +32,100 @@
   header input[type="checkbox"] { accent-color: var(--accent); width: 16px; height: 16px; }
   #kbBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 15px; color: var(--text); cursor: pointer; }
   #kbBtn:hover { border-color: var(--accent); color: var(--accent); }
+  #mcpBtn { display: flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 15px; color: var(--text); cursor: pointer; }
+  #mcpBtn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ===== MCP·하네스 카탈로그 오버레이 (모든 클래스 mcp- 접두어로 격리) ===== */
+  #mcpOverlay { display: none; position: fixed; inset: 0; background: rgba(28,33,40,.45); z-index: 20; }
+  #mcpOverlay.open { display: flex; align-items: stretch; justify-content: center; }
+  .mcp-modal { position: relative; background: var(--bg); width: min(1000px, 100%); margin: 24px; border-radius: 14px; overflow-y: auto; box-shadow: 0 12px 48px rgba(0,0,0,.25); }
+  .mcp-close { position: absolute; top: 14px; right: 16px; z-index: 30; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 16px; color: var(--muted); cursor: pointer; }
+  .mcp-close:hover { border-color: var(--danger); color: var(--danger); }
+  .mcp-wrap { padding: 22px 20px 130px; }
+  .mcp-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; padding-right: 44px; }
+  .mcp-top h2 { font-size: 20px; margin: 0; }
+  .mcp-sub { font-size: 13px; color: var(--muted); margin: 3px 0 0; }
+  .mcp-pull { margin-left: auto; font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+  .mcp-pull b { color: var(--accent-deep); }
+  .mcp-views { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 11px; padding: 4px; gap: 4px; }
+  .mcp-views button { font: inherit; font-size: 14.5px; font-weight: 600; padding: 9px 18px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+  .mcp-views button .mcp-vn { font-size: 11px; font-weight: 600; opacity: .65; }
+  .mcp-views button.on { background: var(--accent); color: #fff; }
+  .mcp-controls { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 14px 0 12px; margin-top: 14px; border-bottom: 1px solid var(--border); }
+  .mcp-searchrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .mcp-search { flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); }
+  .mcp-search input { flex: 1; border: 0; outline: 0; font: inherit; font-size: 15px; background: none; color: var(--text); }
+  .mcp-search .mcp-ic { color: var(--muted); }
+  .mcp-cinst { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .mcp-cinst b { color: #1a7f4b; }
+  .mcp-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 11px; }
+  .mcp-chip { min-height: 32px; padding: 5px 13px; border: 1px solid var(--border); border-radius: 17px; background: var(--panel); font-size: 13.5px; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .mcp-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .mcp-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .mcp-chip .mcp-n { font-size: 11px; opacity: .7; font-variant-numeric: tabular-nums; }
+  .mcp-group { margin-top: 24px; }
+  .mcp-grouph { display: flex; align-items: baseline; gap: 9px; margin: 0 2px 12px; }
+  .mcp-gt { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .mcp-gl { flex: 1; height: 1px; background: var(--border); }
+  .mcp-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .mcp-card { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 15px 16px 14px; display: flex; flex-direction: column; gap: 9px; }
+  .mcp-card:hover { border-color: var(--accent); }
+  .mcp-card.mcp-sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: linear-gradient(0deg, var(--accent-soft) 0%, var(--panel) 60%); }
+  .mcp-chead { display: flex; align-items: flex-start; gap: 11px; }
+  .mcp-chk { flex: none; width: 19px; height: 19px; margin-top: 2px; accent-color: var(--accent); cursor: pointer; }
+  .mcp-namewrap { flex: 1; min-width: 0; }
+  .mcp-cname { font-size: 16px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
+  .mcp-logo { width: 24px; height: 24px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-deep); font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .mcp-logo.mcp-pl { background: #f0e9fb; color: #6d3bbf; }
+  .mcp-cdesc { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0; }
+  .mcp-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mcp-tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 4px; }
+  .mcp-tag.mcp-t-env { color: var(--token); background: var(--token-soft); }
+  .mcp-tag.mcp-t-pop { color: var(--accent-deep); background: var(--accent-soft); }
+  .mcp-tag.mcp-t-free { color: var(--time); background: var(--time-soft); }
+  .mcp-tag.mcp-t-done { color: #1a7f4b; background: #e6f4ec; }
+  .mcp-tag.mcp-t-plugin { color: #6d3bbf; background: #f0e9fb; }
+  .mcp-tag.mcp-t-git { color: var(--muted); background: var(--bg); border: 1px solid var(--border); }
+  .mcp-cfoot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+  .mcp-details { font: inherit; font-size: 12.5px; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 4px 0; display: inline-flex; align-items: center; gap: 4px; }
+  .mcp-details:hover { color: var(--accent); }
+  .mcp-arw { transition: transform .15s; display: inline-block; }
+  .mcp-card.mcp-open .mcp-arw { transform: rotate(90deg); }
+  .mcp-instnote { font-size: 12px; color: #1a7f4b; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .mcp-detailx { display: none; border-top: 1px dashed var(--border); margin-top: 3px; padding-top: 12px; flex-direction: column; gap: 11px; }
+  .mcp-card.mcp-open .mcp-detailx { display: flex; }
+  .mcp-detailx p { margin: 0; font-size: 13px; color: var(--text); line-height: 1.6; }
+  .mcp-kv { display: grid; grid-template-columns: 64px 1fr; gap: 4px 10px; font-size: 12.5px; }
+  .mcp-kv .mcp-k { color: var(--muted); }
+  .mcp-kv code, .mcp-cmd code { font-family: Consolas, 'Courier New', monospace; font-size: 12px; }
+  .mcp-cmd { background: #1c2128; color: #e8eaed; border-radius: 8px; padding: 9px 11px; font-family: Consolas, monospace; font-size: 12px; overflow-x: auto; white-space: pre; line-height: 1.7; }
+  .mcp-flag { color: #f0a56b; } .mcp-str { color: #8fd18f; } .mcp-cmt { color: #7a828c; }
+  .mcp-fblbl { font-size: 11px; color: var(--muted); margin: 4px 0 -4px; }
+  .mcp-doclink { font-size: 12.5px; color: var(--time); text-decoration: none; }
+  .mcp-doclink:hover { text-decoration: underline; }
+  .mcp-envbox { background: var(--token-soft); border: 1px solid #f0dcae; border-radius: 9px; padding: 11px 12px; display: flex; flex-direction: column; gap: 9px; }
+  .mcp-eh { font-size: 12px; font-weight: 700; color: var(--token); display: flex; align-items: center; gap: 6px; }
+  .mcp-envfield label { font-size: 12px; color: var(--text); display: block; margin-bottom: 4px; font-weight: 600; }
+  .mcp-envfield input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; font-size: 13px; background: var(--panel); }
+  .mcp-envfield .mcp-help { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .mcp-bar { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--border); box-shadow: 0 -4px 20px rgba(28,33,40,.07); padding: 14px 20px; margin: 0 -20px -130px; transform: translateY(130%); transition: transform .2s ease; }
+  .mcp-bar.on { transform: none; }
+  .mcp-inner { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .mcp-selcount { font-size: 14px; font-weight: 600; }
+  .mcp-selcount b { color: var(--accent-deep); font-variant-numeric: tabular-nums; }
+  .mcp-warn { display: block; font-size: 11.5px; color: var(--token); font-weight: 500; margin-top: 2px; }
+  .mcp-scopewrap { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .mcp-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .mcp-seg button { font: inherit; font-size: 13px; padding: 7px 13px; border: 0; background: var(--panel); color: var(--muted); cursor: pointer; }
+  .mcp-seg button.on { background: var(--accent); color: #fff; }
+  .mcp-spacer { flex: 1; }
+  .mcp-install-btn { min-height: 44px; padding: 10px 22px; border-radius: 9px; background: var(--accent); color: #fff; border: 0; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .mcp-install-btn:hover { background: var(--accent-deep); }
+  .mcp-install-btn:disabled { opacity: .6; cursor: default; }
+  .mcp-clear { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; cursor: pointer; }
+  .mcp-clear:hover { color: var(--danger); }
+  .mcp-empty { display: none; text-align: center; color: var(--muted); padding: 50px 0; font-size: 14px; }
+  @media (max-width: 720px) { .mcp-cards { grid-template-columns: 1fr; } }
   #filterBar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--border); }
   .chips { display: flex; gap: 4px; }
   .chip { min-height: 36px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 18px; background: var(--panel); font-size: 15px; color: var(--muted); cursor: pointer; }
@@ -210,6 +304,7 @@
   <button id="multiBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg> 동시 열기</button>
   <button id="delBtn" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg> 삭제</button>
   <button id="backupBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 10v5M9.5 12.5 12 15l2.5-2.5"/></svg> 백업 폴더</button>
+  <button id="mcpBtn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/><path d="M11 7h4a2 2 0 0 1 2 2v4M7 11v2a2 2 0 0 0 2 2h2"/></svg> MCP</button>
   <button id="verUpdateBtn" hidden>버전 업데이트하기</button>
 </header>
 <div id="filterBar">
@@ -237,6 +332,48 @@
   <div id="list" role="listbox" aria-label="세션 목록"></div>
   <aside id="detail" aria-label="세션 상세"></aside>
 </main>
+<div id="mcpOverlay" role="dialog" aria-modal="true" aria-label="MCP·하네스 카탈로그">
+  <div class="mcp-modal">
+    <button id="mcpClose" class="mcp-close" aria-label="닫기">✕</button>
+    <div class="mcp-wrap">
+      <div class="mcp-top">
+        <div>
+          <h2 id="mcpH2">🧩 MCP · 하네스 카탈로그</h2>
+          <p class="mcp-sub">원하는 걸 골라 딸깍 설치. MCP 서버와 하네스·플러그인을 한 곳에서 셋업합니다.</p>
+        </div>
+        <div class="mcp-pull">출처: <b>catalog.json</b> · git pull로 최신화</div>
+      </div>
+      <div class="mcp-views" id="mcpViews">
+        <button class="on" data-view="mcp">🧩 MCP 서버 <span class="mcp-vn" id="mcpVnMcp">0</span></button>
+        <button data-view="harness">⚙️ 하네스·플러그인 <span class="mcp-vn" id="mcpVnHar">0</span></button>
+      </div>
+      <div class="mcp-controls">
+        <div class="mcp-searchrow">
+          <div class="mcp-search"><span class="mcp-ic">🔎</span><input id="mcpQ" type="text" placeholder="이름·설명 검색" autocomplete="off"></div>
+          <span class="mcp-cinst">설치됨 <b id="mcpInstCount">0</b> / <span id="mcpTotalCount">0</span></span>
+        </div>
+        <div class="mcp-chips" id="mcpChips"></div>
+      </div>
+      <div id="mcpGroups"></div>
+      <div class="mcp-empty" id="mcpEmpty">검색 결과가 없습니다.</div>
+      <div class="mcp-bar" id="mcpBar">
+        <div class="mcp-inner">
+          <div class="mcp-selcount"><span><b id="mcpSelN">0</b>개 선택됨</span><span class="mcp-warn" id="mcpEnvWarn" style="display:none">🔑 일부는 설치 전 키 입력이 필요합니다</span></div>
+          <div class="mcp-scopewrap" id="mcpScopeWrap">설치 범위:
+            <span class="mcp-seg" id="mcpScopeSeg">
+              <button class="on" data-scope="user">user (전역)</button>
+              <button data-scope="project">project 폴더</button>
+            </span>
+          </div>
+          <div class="mcp-scopewrap" id="mcpPluginNote" style="display:none">⚙️ 플러그인은 전역(user)으로 설치됩니다</div>
+          <div class="mcp-spacer"></div>
+          <button class="mcp-clear" id="mcpClearBtn">선택 해제</button>
+          <button class="mcp-install-btn" id="mcpInstallBtn">⬇ 선택한 <span id="mcpSelN2">0</span>개 설치</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 <div id="delOverlay" style="display:none; position:fixed; inset:0; background:rgba(28,33,40,.4); z-index:11; align-items:center; justify-content:center;">
   <div role="alertdialog" aria-modal="true" aria-labelledby="delTitle" style="background:var(--panel); border-radius:12px; padding:24px; width:400px; max-width:calc(100vw - 24px); box-shadow:0 12px 32px rgba(28,33,40,.18);">
     <h2 id="delTitle" style="font-size:19px; margin:0 0 8px;">정말 삭제할까요?</h2>
@@ -1548,4 +1685,187 @@ document.getElementById('updSnooze').onclick = () => {
 };
 
 load();
+
+/* ===== MCP·하네스 카탈로그 (IIFE로 전역 격리) ===== */
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const overlay = $('mcpOverlay');
+  if (!overlay) return;
+
+  let CATALOG = { mcp: [], harness: [], installed: { mcp: [], harness: [] } };
+  let view = 'mcp', curCat = 'all', q = '';
+  const selMcp = new Set(), selHar = new Set();
+
+  const CATS_MCP = { dev: '🛠️ 개발', web: '🌐 브라우저·웹', data: '🗄️ 데이터', collab: '💬 협업', ai: '🧠 AI·유틸' };
+  const CATS_HAR = { workflow: '🔀 워크플로우', quality: '✅ 품질·리뷰', design: '🎨 디자인', domain: '🎮 도메인' };
+  const TAGDEF = {
+    pop: { cls: 'mcp-t-pop', txt: '⭐ 인기' }, env: { cls: 'mcp-t-env', txt: '🔑 env 필요' },
+    free: { cls: 'mcp-t-free', txt: '✓ 즉시 설치' }, installed: { cls: 'mcp-t-done', txt: '● 설치됨' },
+    plugin: { cls: 'mcp-t-plugin', txt: '🧩 플러그인' }, git: { cls: 'mcp-t-git', txt: '⿻ git clone' },
+  };
+
+  const curList = () => view === 'mcp' ? CATALOG.mcp : CATALOG.harness;
+  const curSel = () => view === 'mcp' ? selMcp : selHar;
+  const curCats = () => view === 'mcp' ? CATS_MCP : CATS_HAR;
+  const instArr = () => view === 'mcp' ? CATALOG.installed.mcp : CATALOG.installed.harness;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function isInstalled(m) { const a = instArr(); return a.includes(m.id) || a.includes(m.name); }
+
+  function tagsFor(m) {
+    const t = [];
+    if (m.popular) t.push('pop');
+    if (view === 'mcp') { (m.env && m.env.length) ? t.push('env') : t.push('free'); }
+    else { (m.steps || []).some((s) => s.indexOf('/plugin') === 0) ? t.push('plugin') : t.push('git'); }
+    if (isInstalled(m)) t.push('installed');
+    return t;
+  }
+  function mcpCmd(m) {
+    if (m.transport === 'http') return 'claude mcp add <span class="mcp-flag">-t</span> http <span class="mcp-flag">-s</span> user ' + esc(m.id) + ' ' + esc(m.url || '');
+    const parts = [m.command, ...(m.args || [])].map((a) => /[\\\s]/.test(a) ? '<span class="mcp-str">' + esc(a) + '</span>' : esc(a));
+    const envFlags = (m.env || []).map((e) => '<span class="mcp-flag">-e</span> ' + esc(e.key) + '=…').join(' ');
+    return 'claude mcp add <span class="mcp-flag">-s</span> user ' + (envFlags ? envFlags + ' ' : '') + esc(m.id) + ' -- ' + parts.join(' ');
+  }
+  function harCmd(h) {
+    const lines = (h.steps || []).map((s) => esc(s).replace(/(@[\w/-]+)/g, '<span class="mcp-flag">$1</span>'));
+    if (h.fallback && h.fallback.length) {
+      lines.push('<span class="mcp-cmt"># 위가 안 되면 폴백 ↓</span>');
+      for (const f of h.fallback) lines.push(esc(f));
+    }
+    return lines.join('\n');
+  }
+  function cardHtml(m) {
+    const isMcp = view === 'mcp';
+    const inst = isInstalled(m);
+    const tags = tagsFor(m).map((t) => `<span class="mcp-tag ${TAGDEF[t].cls}">${TAGDEF[t].txt}</span>`).join('');
+    const envHtml = (isMcp && m.env && m.env.length) ? `
+      <div class="mcp-envbox"><div class="mcp-eh">🔑 설치하려면 아래 값이 필요합니다</div>
+      ${m.env.map((e) => `<div class="mcp-envfield"><label>${esc(e.label || e.key)} <code style="color:var(--token)">${esc(e.key)}</code></label><input type="text" data-envkey="${esc(e.key)}" placeholder="값을 붙여넣으세요"><div class="mcp-help">${esc(e.help || '')}</div></div>`).join('')}
+      </div>` : '';
+    const kv = isMcp
+      ? `<div class="mcp-kv"><span class="mcp-k">명령</span><span><code>${esc(m.command)} ${esc((m.args || []).join(' '))}</code></span><span class="mcp-k">env</span><span>${(m.env && m.env.length) ? m.env.map((e) => '<code>' + esc(e.key) + '</code>').join(', ') : '<span style="color:#1a7f4b">불필요 — 즉시 설치</span>'}</span></div>`
+      : `<div class="mcp-fblbl">${(m.steps || []).some((s) => s.indexOf('/plugin') === 0) ? '설치 순서 (플러그인 → 실패 시 폴백):' : '설치:'}</div>`;
+    const cmd = isMcp ? mcpCmd(m) : harCmd(m);
+    return `<div class="mcp-card" data-id="${esc(m.id)}">
+      <div class="mcp-chead"><input class="mcp-chk" type="checkbox" ${inst ? 'disabled title="이미 설치됨"' : ''}>
+        <div class="mcp-namewrap"><div class="mcp-cname"><span class="mcp-logo ${isMcp ? '' : 'mcp-pl'}">${esc((m.name || '?').slice(0, 2).toUpperCase())}</span>${esc(m.name)}</div></div></div>
+      <p class="mcp-cdesc">${esc(m.description)}</p>
+      <div class="mcp-tags">${tags}</div>
+      <div class="mcp-cfoot"><button class="mcp-details"><span class="mcp-arw">▸</span> 자세히 보기</button>${inst ? '<span class="mcp-instnote">✓ 사용 중</span>' : ''}</div>
+      <div class="mcp-detailx"><p>${esc(m.long || m.description)}</p>${isMcp ? '' : kv}<div class="mcp-cmd">${cmd}</div>${isMcp ? kv : ''}${envHtml}<a class="mcp-doclink" href="#" onclick="return false">📄 ${esc(m.docs)}</a></div>
+    </div>`;
+  }
+  function render() {
+    const list = curList().filter((m) => (curCat === 'all' || m.category === curCat) &&
+      (!q || (m.name + ' ' + (m.description || '') + ' ' + (m.long || '') + ' ' + m.id).toLowerCase().includes(q)));
+    const cats = curCat === 'all' ? Object.keys(curCats()) : [curCat];
+    let html = '';
+    for (const c of cats) {
+      const items = list.filter((m) => m.category === c);
+      if (!items.length) continue;
+      html += `<div class="mcp-group"><div class="mcp-grouph"><span class="mcp-gt">${curCats()[c]}</span><span class="mcp-gl"></span></div><div class="mcp-cards">${items.map(cardHtml).join('')}</div></div>`;
+    }
+    $('mcpGroups').innerHTML = html;
+    $('mcpEmpty').style.display = list.length ? 'none' : 'block';
+    wire(); syncSel();
+  }
+  function renderChips() {
+    const cats = curCats(), all = curList(), a = instArr();
+    let h = `<button class="mcp-chip on" data-cat="all">전체 <span class="mcp-n">${all.length}</span></button>`;
+    for (const c in cats) h += `<button class="mcp-chip" data-cat="${c}">${cats[c]} <span class="mcp-n">${all.filter((m) => m.category === c).length}</span></button>`;
+    $('mcpChips').innerHTML = h;
+    $('mcpInstCount').textContent = all.filter((m) => a.includes(m.id) || a.includes(m.name)).length;
+    $('mcpTotalCount').textContent = all.length;
+  }
+  function wire() {
+    overlay.querySelectorAll('.mcp-details').forEach((b) => { b.onclick = () => b.closest('.mcp-card').classList.toggle('mcp-open'); });
+    overlay.querySelectorAll('.mcp-chk').forEach((chk) => {
+      const card = chk.closest('.mcp-card'), id = card.dataset.id, S = curSel();
+      chk.checked = S.has(id);
+      if (S.has(id)) card.classList.add('mcp-sel');
+      chk.onchange = () => {
+        if (chk.checked) { S.add(id); card.classList.add('mcp-sel'); } else { S.delete(id); card.classList.remove('mcp-sel'); }
+        syncSel();
+      };
+    });
+  }
+  function syncSel() {
+    const S = curSel(), n = S.size;
+    $('mcpSelN').textContent = n; $('mcpSelN2').textContent = n;
+    $('mcpBar').classList.toggle('on', n > 0);
+    const needsEnv = view === 'mcp' && [...S].some((id) => { const m = CATALOG.mcp.find((x) => x.id === id); return m && m.env && m.env.length; });
+    $('mcpEnvWarn').style.display = needsEnv ? 'block' : 'none';
+    $('mcpScopeWrap').style.display = view === 'mcp' ? 'flex' : 'none';
+    $('mcpPluginNote').style.display = view === 'mcp' ? 'none' : 'flex';
+  }
+  async function loadCatalog() {
+    try { const r = await fetch('/api/catalog'); CATALOG = await r.json(); }
+    catch { CATALOG = { mcp: [], harness: [], installed: { mcp: [], harness: [] } }; }
+    if (!CATALOG.installed) CATALOG.installed = { mcp: [], harness: [] };
+    $('mcpVnMcp').textContent = CATALOG.mcp.length;
+    $('mcpVnHar').textContent = CATALOG.harness.length;
+    renderChips(); render();
+  }
+  function collectEnv(id) {
+    const card = overlay.querySelector(`.mcp-card[data-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`);
+    const vals = {};
+    if (card) card.querySelectorAll('.mcp-envfield input').forEach((inp) => { const k = inp.dataset.envkey; if (k) vals[k] = inp.value.trim(); });
+    return vals;
+  }
+
+  $('mcpViews').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('mcpViews').querySelectorAll('button').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on'); view = b.dataset.view; curCat = 'all'; q = ''; $('mcpQ').value = '';
+    $('mcpH2').textContent = view === 'mcp' ? '🧩 MCP 서버 카탈로그' : '⚙️ 하네스·플러그인 카탈로그';
+    renderChips(); render();
+  };
+  $('mcpChips').onclick = (e) => {
+    const c = e.target.closest('.mcp-chip'); if (!c) return;
+    $('mcpChips').querySelectorAll('.mcp-chip').forEach((x) => x.classList.remove('on'));
+    c.classList.add('on'); curCat = c.dataset.cat; render();
+  };
+  $('mcpQ').oninput = (e) => { q = e.target.value.trim().toLowerCase(); render(); };
+  $('mcpClearBtn').onclick = () => { curSel().clear(); render(); };
+  $('mcpScopeSeg').onclick = (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('mcpScopeSeg').querySelectorAll('button').forEach((x) => x.classList.remove('on')); b.classList.add('on');
+  };
+  $('mcpInstallBtn').onclick = async () => {
+    const S = curSel(); if (!S.size) return;
+    const btn = $('mcpInstallBtn'), orig = btn.innerHTML;
+    btn.disabled = true; btn.textContent = '설치 중…';
+    let ok = false;
+    try {
+      if (view === 'mcp') {
+        const scope = $('mcpScopeSeg').querySelector('button.on').dataset.scope;
+        let projectDir;
+        if (scope === 'project') {
+          const r = await fetch('/api/pick-folder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          const j = await r.json();
+          if (j.cancelled || !j.path) { btn.disabled = false; btn.innerHTML = orig; return; }
+          projectDir = j.path;
+        }
+        const items = [...S].map((id) => ({ id, envValues: collectEnv(id) }));
+        const res = await fetch('/api/mcp-install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items, scope, projectDir }) });
+        const j = await res.json();
+        alert((j.results || []).map((x) => `${x.id}: ${x.ok ? '✅ 설치됨' : '❌ ' + x.message}`).join('\n') || (j.error || '실패'));
+      } else {
+        const res = await fetch('/api/harness-install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [...S] }) });
+        const j = await res.json();
+        alert(j.ok ? `새 터미널에서 설치를 시작합니다: ${j.launched.join(', ')}` : ('실패: ' + (j.error || '')));
+      }
+      ok = true;
+    } catch (err) { alert('설치 실패: ' + err.message); }
+    btn.disabled = false; btn.innerHTML = orig;
+    if (ok) { curSel().clear(); await loadCatalog(); }
+  };
+
+  function openMcp() { overlay.classList.add('open'); loadCatalog(); }
+  function closeMcp() { overlay.classList.remove('open'); }
+  $('mcpBtn').onclick = openMcp;
+  $('mcpClose').onclick = closeMcp;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeMcp(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && overlay.classList.contains('open')) closeMcp(); });
+})();
 </script>
