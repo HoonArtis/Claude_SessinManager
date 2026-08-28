@@ -1,0 +1,160 @@
+{
+  "mcp": [
+    {
+      "id": "github", "name": "GitHub", "category": "dev", "popular": true,
+      "description": "이슈·PR·레포 조회·조작",
+      "long": "저장소 검색, 파일 읽기, 이슈/PR 생성·코멘트, 브랜치 관리 등을 Claude가 직접 수행합니다.",
+      "docs": "github.com/github/github-mcp-server",
+      "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"],
+      "url": null, "headers": [],
+      "env": [{ "key": "GITHUB_TOKEN", "label": "GitHub Personal Access Token", "help": "github.com/settings/tokens 에서 repo 권한으로 발급" }]
+    },
+    {
+      "id": "filesystem", "name": "Filesystem", "category": "dev", "popular": false,
+      "description": "허용한 폴더의 파일을 읽고 씁니다.",
+      "long": "지정한 디렉터리 안에서만 파일 목록·읽기·쓰기·이동을 수행합니다. 경로는 설치 시 지정합니다.",
+      "docs": "github.com/modelcontextprotocol/servers",
+      "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\work"],
+      "url": null, "headers": [], "env": []
+    },
+    {
+      "id": "git", "name": "Git", "category": "dev", "popular": false,
+      "description": "로컬 저장소의 커밋·diff·로그를 다룹니다.",
+      "long": "status·diff·log·commit 등 git 명령을 Claude가 안전하게 수행합니다.",
+      "docs": "github.com/modelcontextprotocol/servers",
+      "transport": "stdio", "command": "uvx", "args": ["mcp-server-git"],
+      "url": null, "headers": [], "env": []
+    },
+    {
+      "id": "sentry", "name": "Sentry", "category": "dev", "popular": false,
+      "description": "에러 이슈와 스택트레이스를 가져옵니다.",
+      "long": "프로젝트의 최근 이슈, 이벤트 상세, 스택트레이스를 조회해 디버깅을 돕습니다.",
+      "docs": "docs.sentry.io",
+      "transport": "stdio", "command": "npx", "args": ["-y", "@sentry/mcp-server"],
+      "url": null, "headers": [],
+      "env": [{ "key": "SENTRY_AUTH_TOKEN", "label": "Sentry Auth Token", "help": "Settings → Auth Tokens" }]
+    },
+    {
+      "id": "playwright", "name": "Playwright", "category": "web", "popular": true,
+      "description": "브라우저를 자동 조작하고 스크린샷을 찍습니다.",
+      "long": "실제 크로미움을 띄워 페이지 이동·클릭·입력·스크린샷·접근성 트리 추출을 수행합니다. 웹 테스트/스크래핑에 강력합니다.",
+      "docs": "github.com/microsoft/playwright-mcp",
+      "transport": "stdio", "command": "npx", "args": ["@playwright/mcp@latest"],
+      "url": null, "headers": [], "env": []
+    },
+    {
+      "id": "fetch", "name": "Fetch", "category": "web", "popular": false,
+      "description": "URL을 가져와 마크다운으로 변환합니다.",
+      "long": "웹 페이지를 받아 본문만 추려 마크다운으로 돌려줍니다. 가벼운 웹 읽기에 적합.",
+      "docs": "github.com/modelcontextprotocol/servers",
+      "transport": "stdio", "command": "uvx", "args": ["mcp-server-fetch"],
+      "url": null, "headers": [], "env": []
+    },
+    {
+      "id": "brave", "name": "Brave Search", "category": "web", "popular": false,
+      "description": "웹·로컬 검색 결과를 가져옵니다.",
+      "long": "Brave 검색 API로 웹/뉴스/로컬 결과를 조회합니다.",
+      "docs": "github.com/modelcontextprotocol/servers",
+      "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "url": null, "headers": [],
+      "env": [{ "key": "BRAVE_API_KEY", "label": "Brave Search API Key", "help": "api.search.brave.com 에서 무료 발급" }]
+    },
+    {
+      "id": "postgres", "name": "PostgreSQL", "category": "data", "popular": false,
+      "description": "DB 스키마를 읽고 읽기전용 쿼리를 실행합니다.",
+      "long": "테이블 구조 조회와 read-only SQL 실행을 제공합니다. 쓰기는 막혀 있어 안전합니다.",
+      "docs": "github.com/modelcontextprotocol/servers",
+      "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres"],
+      "url": null, "headers": [],
+      "env": [{ "key": "POSTGRES_URL", "label": "접속 문자열", "help": "postgres://user:pass@host:5432/db" }]
+    },
+    {
+      "id": "sqlite", "name": "SQLite", "category": "data", "popular": false,
+      "description": "로컬 .db 파일을 조회·분석합니다.",
+      "long": "단일 파일 DB를 열어 테이블 탐색과 쿼리를 수행합니다.",
+      "docs": "github.com/modelcontextprotocol/servers",
+      "transport": "stdio", "command": "uvx", "args": ["mcp-server-sqlite", "--db-path", "app.db"],
+      "url": null, "headers": [], "env": []
+    },
+    {
+      "id": "gdrive", "name": "Google Drive", "category": "data", "popular": false,
+      "description": "문서를 검색하고 내용을 읽어옵니다.",
+      "long": "드라이브 파일 검색과 Google 문서 텍스트 추출을 제공합니다.",
+      "docs": "github.com/modelcontextprotocol/servers",
+      "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-gdrive"],
+      "url": null, "headers": [],
+      "env": [{ "key": "GDRIVE_CREDS", "label": "OAuth 자격증명 경로", "help": "credentials.json 경로" }]
+    },
+    {
+      "id": "slack", "name": "Slack", "category": "collab", "popular": true,
+      "description": "채널·메시지를 읽고 보냅니다.",
+      "long": "채널 목록/히스토리 조회, 메시지 전송, 스레드 답글, 리액션을 지원합니다.",
+      "docs": "github.com/modelcontextprotocol/servers",
+      "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"],
+      "url": null, "headers": [],
+      "env": [
+        { "key": "SLACK_BOT_TOKEN", "label": "Bot Token (xoxb-)", "help": "api.slack.com/apps 에서 봇 토큰 발급" },
+        { "key": "SLACK_TEAM_ID", "label": "Team ID", "help": "워크스페이스 ID (T로 시작)" }
+      ]
+    },
+    {
+      "id": "notion", "name": "Notion", "category": "collab", "popular": false,
+      "description": "페이지·DB를 조회하고 편집합니다.",
+      "long": "페이지/데이터베이스 검색, 블록 읽기·쓰기, 속성 갱신을 지원합니다.",
+      "docs": "developers.notion.com",
+      "transport": "stdio", "command": "npx", "args": ["-y", "@notionhq/notion-mcp-server"],
+      "url": null, "headers": [],
+      "env": [{ "key": "NOTION_TOKEN", "label": "Notion Integration Token", "help": "notion.so/my-integrations 에서 발급 후 페이지 공유" }]
+    },
+    {
+      "id": "memory", "name": "Memory", "category": "ai", "popular": false,
+      "description": "세션 간 지식 그래프를 저장합니다.",
+      "long": "엔티티·관계를 로컬 지식 그래프로 저장해 대화 사이에 기억을 유지합니다.",
+      "docs": "github.com/modelcontextprotocol/servers",
+      "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "url": null, "headers": [], "env": []
+    },
+    {
+      "id": "seqthink", "name": "Sequential Thinking", "category": "ai", "popular": false,
+      "description": "복잡한 문제를 단계적으로 사고합니다.",
+      "long": "생각을 단계로 분해하고 되짚으며 추론하는 도구를 제공합니다.",
+      "docs": "github.com/modelcontextprotocol/servers",
+      "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "url": null, "headers": [], "env": []
+    }
+  ],
+  "harness": [
+    {
+      "id": "impeccable", "name": "impeccable", "category": "design", "popular": true,
+      "description": "AI가 만든 UI의 어색함을 감지·교정하는 디자인 하네스",
+      "long": "\"에이전트를 위한 디자인 어휘\" — AI가 생성한 UI의 결함을 감지하고, 정밀한 명령으로 인터페이스를 다듬습니다. Chrome 확장·CI용 CLI(npx impeccable detect)도 제공.",
+      "docs": "impeccable.style",
+      "steps": ["/plugin marketplace add pbakaus/impeccable", "/impeccable init"],
+      "fallback": ["npx impeccable install"]
+    },
+    {
+      "id": "superpowers", "name": "superpowers", "category": "workflow", "popular": true,
+      "description": "brainstorm·TDD·디버깅 등 개발 워크플로우 스킬 묶음",
+      "long": "브레인스토밍, 계획 작성, TDD, 체계적 디버깅 등 개발 워크플로우 스킬을 한 번에 설치합니다.",
+      "docs": "github.com/obra/superpowers",
+      "steps": ["/plugin marketplace add obra/superpowers", "/plugin install superpowers@superpowers-marketplace"],
+      "fallback": []
+    },
+    {
+      "id": "elements-of-style", "name": "elements-of-style", "category": "workflow", "popular": false,
+      "description": "문서·커밋·에러 메시지를 간결하게 다듬는 글쓰기 스킬",
+      "long": "Strunk의 글쓰기 규칙으로 사람에게 보이는 모든 산문을 더 명료하고 간결하게 다듬습니다.",
+      "docs": "github.com/obra/superpowers",
+      "steps": ["/plugin marketplace add obra/superpowers", "/plugin install elements-of-style@superpowers-marketplace"],
+      "fallback": []
+    },
+    {
+      "id": "narsha-adk", "name": "narsha-adk", "category": "domain", "popular": false,
+      "description": "언리얼 엔진 MCP 스페셜리스트 스킬팩",
+      "long": "UE 블루프린트·머티리얼·시퀀서·빌드 등 언리얼 작업용 에이전트/스킬 모음.",
+      "docs": "github.com/narshastudio/narsha-adk",
+      "steps": ["/plugin marketplace add narshastudio/narsha-adk", "/plugin install narsha-adk@narsha-adk"],
+      "fallback": []
+    }
+  ]
+}
