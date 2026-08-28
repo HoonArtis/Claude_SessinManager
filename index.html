@@ -1799,12 +1799,20 @@ load();
     $('mcpPluginNote').style.display = view === 'mcp' ? 'none' : 'flex';
   }
   async function loadCatalog() {
-    try { const r = await fetch('/api/catalog'); CATALOG = await r.json(); }
-    catch { CATALOG = { mcp: [], harness: [], installed: { mcp: [], harness: [] } }; }
-    if (!CATALOG.installed) CATALOG.installed = { mcp: [], harness: [] };
+    try { const r = await fetch('/api/catalog'); const j = await r.json(); CATALOG.mcp = j.mcp || []; CATALOG.harness = j.harness || []; }
+    catch { CATALOG.mcp = []; CATALOG.harness = []; }
+    CATALOG.installed = { mcp: [], harness: [] };
     $('mcpVnMcp').textContent = CATALOG.mcp.length;
     $('mcpVnHar').textContent = CATALOG.harness.length;
     renderChips(); render();
+    // 설치 감지는 느릴 수 있어(claude mcp list 헬스체크) 뒤늦게 채운 뒤 배지만 갱신.
+    fetch('/api/installed').then((r) => r.json()).then((inst) => {
+      CATALOG.installed = { mcp: inst.mcp || [], harness: inst.harness || [] };
+      // 유저가 선택/펼침 중이면 카드 재렌더로 입력을 날리지 않도록 칩 카운트만 갱신.
+      const busy = curSel().size > 0 || overlay.querySelector('.mcp-card.mcp-open');
+      renderChips();
+      if (!busy) render();
+    }).catch(() => {});
   }
   function collectEnv(id) {
     const card = overlay.querySelector(`.mcp-card[data-id="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`);

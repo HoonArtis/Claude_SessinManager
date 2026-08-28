@@ -962,8 +962,13 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'GET' && req.url === '/api/catalog') {
       if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
-      const cat = loadCatalog(__dirname);
-      sendJson(res, 200, { ...cat, installed: detectInstalled() });
+      // 목록만 즉시 반환. 설치 감지(claude mcp list 헬스체크가 느림)는 /api/installed로 분리.
+      sendJson(res, 200, loadCatalog(__dirname));
+      return;
+    }
+    if (req.method === 'GET' && req.url === '/api/installed') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      sendJson(res, 200, detectInstalled());
       return;
     }
     if (req.method === 'POST' && req.url === '/api/mcp-install') {
