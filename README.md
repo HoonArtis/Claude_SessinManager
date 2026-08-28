@@ -36,6 +36,11 @@ node server.js
   선택에 따라 claude를 바로 실행. 기본 폴더는 한 번 정하면 고정되고
   (`config.json`의 `newSession.defaultFolder`, 저장 전 자동 백업), claude 자동
   실행 여부는 브라우저에 기억됨
+- [🧩 MCP] — MCP 서버·하네스·플러그인을 카탈로그(`catalog.json`)에서 골라 딸깍
+  설치. 여러 개 다중 선택 가능. MCP는 앱이 `claude mcp add`로 직접 설치(user/
+  project scope 선택, 필요한 키는 설치 전 입력), 하네스는 새 claude 세션에서
+  AI가 설치 스텝(`/plugin …` 등)을 실행. 목록은 git으로 공유·최신화되고, 앱은
+  Claude 설정 파일을 직접 건드리지 않고 `claude` CLI에 설치를 위임함
 - [이어서 작업] — 해당 폴더에서 새 터미널로 `claude --resume` 실행
 - [폴더 열기] — 작업 폴더를 탐색기로 열기
 - 빈 세션 숨김/표시 토글
