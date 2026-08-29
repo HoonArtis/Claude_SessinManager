@@ -11,6 +11,7 @@ const { getKeybindings, setKeybinding, unsetKeybinding } = require('./lib/wt-key
 const { trashSessions } = require('./lib/trash-sessions');
 const { parseSession, extractUserPrompts, extractConversation, extractConversationFull } = require('./lib/parse-session');
 const { buildHandoffMd } = require('./lib/handoff');
+const platform = require('./lib/platform');
 
 const SAFE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
 
@@ -78,29 +79,6 @@ function writeRemoteConfig(key, name) {
   fs.writeFileSync(path.join(__dirname, 'config.json'), JSON.stringify(cfg, null, 2));
 }
 
-// 방화벽 허용(TCP 7777/UDP 7778)을 관리자 권한으로 시도 — UAC 창이 한 번 뜬다
-function tryFirewallElevated() {
-  // remoteip=localsubnet — 같은 서브넷에서 온 패킷만 허용 (인터넷 발 트래픽은 규칙 차원에서 차단)
-  const rules = 'netsh advfirewall firewall add rule name=CSM_TCP_7777 dir=in action=allow protocol=TCP localport=7777 remoteip=localsubnet & netsh advfirewall firewall add rule name=CSM_UDP_7778 dir=in action=allow protocol=UDP localport=7778 remoteip=localsubnet';
-  try {
-    const child = spawn('powershell', ['-WindowStyle', 'Hidden', '-Command',
-      `Start-Process cmd -ArgumentList '/c ${rules}' -Verb RunAs -WindowStyle Hidden`,
-    ], { detached: true, stdio: 'ignore', windowsHide: true });
-    child.unref();
-  } catch { /* 사용자가 UAC를 거부해도 치명적이지 않음 */ }
-}
-
-// 새 코드로 재시작 (업데이트/페어링 공용)
-function restartSelf() {
-  setTimeout(() => {
-    const child = spawn('wscript', [path.join(__dirname, 'restart.vbs')], {
-      cwd: __dirname, detached: true, stdio: 'ignore',
-    });
-    child.unref();
-    process.exit(0);
-  }, 300);
-}
-
 function freshPeers() {
   const now = Date.now();
   return [...peers.entries()]
@@ -150,7 +128,7 @@ function readBody(req) {
   });
 }
 
-const hasWt = spawnSync('where', ['wt'], { windowsHide: true }).status === 0;
+const { hasWt } = platform;
 
 // 이 서버가 Claude Code 세션 안에서 실행됐을 수 있다. 그 표식이 자식(claude/터미널)에
 // 대물림되면 새 세션이 대화 기록을 저장하지 않으므로, 실행 환경에서 항상 제거한다.
@@ -158,6 +136,9 @@ const CLEAN_ENV = { ...process.env };
 for (const k of Object.keys(CLEAN_ENV)) {
   if (k === 'CLAUDECODE' || k.startsWith('CLAUDE_CODE_')) delete CLEAN_ENV[k];
 }
+
+const { launchInTerminal, openFolder, tryFirewallElevated, restartSelf } =
+  platform.makeAdapter({ dirname: __dirname, env: CLEAN_ENV });
 
 // 부팅 시점의 커밋 = 지금 실행 중인 코드의 버전 (이후 pull로 HEAD가 움직여도 불변)
 const BOOT_COMMIT = (() => {
@@ -182,33 +163,6 @@ function wtSettingsPath() {
   return WT_SETTINGS_CANDIDATES.find((p) => fs.existsSync(p)) || null;
 }
 
-// 열기 방식: window(새 창) / tab(기존 창 새 탭) / split-right(오른쪽 분할) / split-down(아래 분할)
-const OPEN_MODES = {
-  window: ['-w', 'new', 'nt'],
-  tab: ['-w', '0', 'nt'],
-  'split-right': ['-w', '0', 'sp', '-V'],
-  'split-down': ['-w', '0', 'sp', '-H'],
-};
-
-function normalizeMode(mode) {
-  return OPEN_MODES[mode] ? mode : 'tab';
-}
-
-function launchInTerminal(cwd, claudeCmd, mode) {
-  let child;
-  if (hasWt) {
-    const openArgs = OPEN_MODES[normalizeMode(mode)];
-    child = spawn('wt', [...openArgs, '-d', cwd, 'cmd', '/k', claudeCmd], { detached: true, stdio: 'ignore', env: CLEAN_ENV });
-  } else {
-    child = spawn('cmd', ['/c', 'start', '"claude"', 'cmd', '/k', `cd /d "${cwd}" && ${claudeCmd}`], {
-      detached: true,
-      stdio: 'ignore',
-      shell: false,
-    });
-  }
-  child.unref();
-}
-
 function launchResume(cwd, sessionId, mode) {
   launchInTerminal(cwd, `claude --resume ${sessionId}`, mode);
 }
@@ -216,11 +170,6 @@ function launchResume(cwd, sessionId, mode) {
 // 새 터미널에서 fresh claude 세션을 열고 핸드오프 문서부터 읽게 한다
 function launchFreshClaude(cwd, mode) {
   launchInTerminal(cwd, 'claude "CLAUDE-HANDOFF.md 파일을 읽고 맥락을 파악한 뒤 다음 해야 할 일부터 이어서 작업해줘"', mode);
-}
-
-function openFolder(cwd) {
-  const child = spawn('explorer.exe', [cwd], { detached: true, stdio: 'ignore' });
-  child.unref();
 }
 
 function validCwd(res, cwd) {
@@ -262,6 +211,11 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 403, { error: '인증 실패: 공유 키가 없거나 일치하지 않습니다.' });
         return;
       }
+    }
+    if (req.method === 'GET' && req.url === '/api/capabilities') {
+      // 이 OS에서 실체가 있는 기능만 UI에 노출하기 위한 값
+      sendJson(res, 200, platform.capabilities());
+      return;
     }
     if (req.method === 'GET' && req.url === '/api/peers') {
       sendJson(res, 200, { enabled: REMOTE_ON, name: MY_NAME, peers: freshPeers() });
@@ -418,7 +372,9 @@ const server = http.createServer(async (req, res) => {
       }
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' });
       // stream-json: assistant 메시지가 나오는 대로 스트리밍, 마지막 result에서 분기 ID를 체인에 기록
-      const child = spawn('cmd', ['/c', 'claude', '-p', '--resume', effectiveId, '--output-format', 'stream-json', '--verbose'], {
+      const headless = platform.buildHeadlessClaudeCommand(
+        ['-p', '--resume', effectiveId, '--output-format', 'stream-json', '--verbose']);
+      const child = spawn(headless.cmd, headless.args, {
         cwd: meta.cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: CLEAN_ENV,
       });
       const killer = setTimeout(() => { try { child.kill(); } catch {} }, 10 * 60 * 1000);

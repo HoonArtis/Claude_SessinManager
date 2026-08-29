@@ -561,9 +561,9 @@ function renderDetail() {
     <div class="open-mode" role="group" aria-label="터미널 열기 방식">
       <span class="open-mode-label">열기 방식</span>
       <button class="mode-btn" data-mode="window">새 창</button>
-      <button class="mode-btn" data-mode="tab">새 탭</button>
+      ${CAPS.splitModes ? `<button class="mode-btn" data-mode="tab">새 탭</button>
       <button class="mode-btn" data-mode="split-right">분할 →</button>
-      <button class="mode-btn" data-mode="split-down">분할 ↓</button>
+      <button class="mode-btn" data-mode="split-down">분할 ↓</button>` : ''}
     </div>
     <div class="btn-row">
       <button id="speedupBtn"${s.cwd ? '' : ' disabled'}>${ICONS.bolt} 세션 초기화 (속도업)</button>
@@ -572,12 +572,12 @@ function renderDetail() {
     <div class="btn-row">
       <button id="convBtn">${ICONS.chat} 최근 대화 보기</button>
       <button id="exportBtn">${ICONS.download} MD 내보내기</button>
-      <button id="exportRawBtn" title="세션 원본(.jsonl) 다운로드 — 다른 PC의 .claude\\projects에 넣으면 그대로 이어서 쓸 수 있음">${ICONS.download} 원본</button>
+      <button id="exportRawBtn" title="세션 원본(.jsonl) 다운로드 — 다른 PC의 ${IS_MAC_UI() ? '.claude/projects' : '.claude\\projects'}에 넣으면 그대로 이어서 쓸 수 있음">${ICONS.download} 원본</button>
     </div>
     <div id="convList" hidden></div>
     <div id="status" role="status" aria-live="polite"></div>`;
   document.getElementById('resumeBtn').onclick = () => callApi('/api/resume', s, '터미널을 열었습니다.');
-  document.getElementById('openBtn').onclick = () => callApi('/api/open-folder', s, '탐색기를 열었습니다.');
+  document.getElementById('openBtn').onclick = () => callApi('/api/open-folder', s, IS_MAC_UI() ? 'Finder를 열었습니다.' : '탐색기를 열었습니다.');
   $detail.querySelectorAll('.mode-btn').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.mode === getOpenMode());
     btn.onclick = () => {
@@ -846,9 +846,27 @@ async function toggleConversation(s) {
   }
 }
 
+// 이 OS에서 실체가 있는 기능 (서버가 알려준다). 조회 전엔 보수적으로 전부 끔.
+let CAPS = { platform: '', keybindings: false, splitModes: false };
+const IS_MAC_UI = () => CAPS.platform === 'darwin';
+
+async function loadCapabilities() {
+  try {
+    CAPS = await (await fetch('/api/capabilities')).json();
+  } catch { /* 조회 실패 시 기본값 유지 */ }
+  applyCapabilities();
+}
+
+// Windows Terminal 단축키 편집은 맥에 대응 기능이 없어 버튼째 숨긴다
+function applyCapabilities() {
+  const kb = document.getElementById('kbBtn');
+  if (kb) kb.hidden = !CAPS.keybindings;
+}
+
 function getOpenMode() {
   const m = localStorage.getItem('csm-open-mode');
-  return ['window', 'tab', 'split-right', 'split-down'].includes(m) ? m : 'tab';
+  const modes = CAPS.splitModes ? ['window', 'tab', 'split-right', 'split-down'] : ['window'];
+  return modes.includes(m) ? m : (CAPS.splitModes ? 'tab' : 'window');
 }
 
 async function callApi(url, s, okMsg) {
@@ -991,7 +1009,7 @@ $delBtn.onclick = () => {
 function openDeleteConfirm() {
   if (!checked.size) return;
   document.getElementById('delDesc').textContent =
-    `세션 ${checked.size}개를 삭제합니다. 파일은 완전히 지워지지 않고 휴지통(.claude\\projects\\.csm-trash)으로 이동하며, 필요하면 되돌릴 수 있습니다.`;
+    `세션 ${checked.size}개를 삭제합니다. 파일은 완전히 지워지지 않고 휴지통(${IS_MAC_UI() ? '.claude/projects/.csm-trash' : '.claude\\projects\\.csm-trash'})으로 이동하며, 필요하면 되돌릴 수 있습니다.`;
   $delOverlay.style.display = 'flex';
   document.getElementById('delNo').focus();
 }
@@ -1405,5 +1423,5 @@ document.getElementById('updSnooze').onclick = () => {
   document.getElementById('verUpdateBtn').hidden = false;
 };
 
-load();
+loadCapabilities().then(load);
 </script>

@@ -6,16 +6,25 @@
 
 ## 설치 (처음 받은 경우)
 
+**Windows**
+
 1. 이 폴더를 원하는 위치에 복사
 2. `setup.bat` 더블클릭 — 바탕화면에 "Claude 세션 매니저" 바로가기가
    생기고 바로 실행됩니다
 
-요구사항: Windows + [Node.js](https://nodejs.org). Claude Code가 설치되어
-있으면 이어서 작업/세션 초기화 기능까지 전부 사용 가능합니다.
+**macOS** (`MAC` 브랜치)
+
+1. 이 폴더를 원하는 위치에 복사
+2. `setup.command` 더블클릭 — 응용 프로그램에 "Claude 세션 매니저.app"이
+   생기고 바로 실행됩니다 (Node.js가 없으면 Homebrew로 설치할지 물어봅니다)
+
+요구사항: Windows 또는 macOS + [Node.js](https://nodejs.org). Claude Code가
+설치되어 있으면 이어서 작업/세션 초기화 기능까지 전부 사용 가능합니다.
 
 ## 실행
 
-바탕화면 바로가기 더블클릭, 또는 `launch.bat` 더블클릭, 또는:
+Windows는 바탕화면 바로가기 또는 `launch.bat`, macOS는 응용 프로그램의
+"Claude 세션 매니저.app". 또는 어느 쪽이든:
 
 ```
 node server.js
@@ -33,11 +42,11 @@ node server.js
   초기화 권장만 보기
 - 세션 상세 (첫/마지막 프롬프트, 작업 시간, git 브랜치)
 - [이어서 작업] — 해당 폴더에서 새 터미널로 `claude --resume` 실행
-- [폴더 열기] — 작업 폴더를 탐색기로 열기
+- [폴더 열기] — 작업 폴더를 탐색기(macOS는 Finder)로 열기
 - 빈 세션 숨김/표시 토글
 - [⌨ 터미널 단축키] — Windows Terminal 탭/분할/편집/보기 단축키를 앱에서
   변경하면 실제 settings.json에 즉시 반영 (저장 전 자동 백업:
-  `settings.json.csm-backup`)
+  `settings.json.csm-backup`) — **Windows 전용**, macOS에서는 버튼이 숨겨집니다
 - [삭제] — 삭제 모드에서 세션을 다중 선택해 정리. 완전 삭제가 아니라
   `~/.claude/projects/.csm-trash/`로 이동하므로 되돌릴 수 있음
 - [⚡ 세션 초기화 (속도업)] — 컨텍스트가 무거워진 세션(카드에
@@ -83,3 +92,15 @@ node server.js
 ```
 node --test
 ```
+
+## macOS와 Windows의 차이
+
+| | Windows | macOS |
+|---|---|---|
+| 터미널 열기 | Windows Terminal (창/탭/분할), 없으면 cmd | Ghostty, 없으면 Terminal.app — **새 창만** |
+| 폴더 열기 | 탐색기 | Finder |
+| 터미널 단축키 편집 | 지원 | 대응 기능 없음 (버튼 숨김) |
+| 원격 방화벽 허용 | `netsh` 자동 시도 (UAC) | macOS가 첫 접속 때 직접 물어봄 |
+
+OS 의존 동작은 `lib/platform.js` 한 곳에 모여 있고 `process.platform`으로
+분기합니다. 자세한 내용은 `docs/superpowers/specs/2026-08-29-macos-port-design.md`.
