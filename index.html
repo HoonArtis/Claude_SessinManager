@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Claude 세션 매니저</title>
 <style>
-  :root { --bg: #f6f7f9; --panel: #fff; --border: #e2e5ea; --text: #1c2128; --muted: #5c6470; --accent: #c96442; --accent-deep: #a84a2e; --accent-soft: #f7e8e2; --time: #1d4ed8; --time-soft: #eff3fe; --token: #96470a; --token-soft: #fdf3e3; --danger: #c0392b; }
+  :root { --bg: #f6f7f9; --panel: #fff; --border: #e2e5ea; --text: #1c2128; --muted: #5c6470; --accent: #b5502e; --accent-deep: #97401f; --accent-soft: #f7e8e2; --time: #1d4ed8; --time-soft: #eff3fe; --token: #96470a; --token-soft: #fdf3e3; --danger: #c0392b; }
   * { box-sizing: border-box; }
   ::selection { background: var(--accent-soft); color: var(--text); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
@@ -67,7 +67,7 @@
   .mcp-grouph { display: flex; align-items: baseline; gap: 9px; margin: 0 2px 12px; }
   .mcp-gt { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .mcp-gl { flex: 1; height: 1px; background: var(--border); }
-  .mcp-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .mcp-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; align-items: start; }
   .mcp-card { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 15px 16px 14px; display: flex; flex-direction: column; gap: 9px; }
   .mcp-card:hover { border-color: var(--accent); }
   .mcp-card.mcp-sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: linear-gradient(0deg, var(--accent-soft) 0%, var(--panel) 60%); }
@@ -86,6 +86,8 @@
   .mcp-tag.mcp-t-done { color: #1a7f4b; background: #e6f4ec; }
   .mcp-tag.mcp-t-plugin { color: #6d3bbf; background: #f0e9fb; }
   .mcp-tag.mcp-t-git { color: var(--muted); background: var(--bg); border: 1px solid var(--border); }
+  .mcp-tag.mcp-t-manual { color: #8a5a00; background: #fbeccd; }
+  .mcp-manualnote { font-size: 12.5px; line-height: 1.8; color: var(--text); font-family: Consolas, 'Courier New', monospace; }
   .mcp-cfoot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
   .mcp-details { font: inherit; font-size: 12.5px; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 4px 0; display: inline-flex; align-items: center; gap: 4px; }
   .mcp-details:hover { color: var(--accent); }
@@ -1696,12 +1698,13 @@ load();
   let view = 'mcp', curCat = 'all', q = '';
   const selMcp = new Set(), selHar = new Set();
 
-  const CATS_MCP = { dev: '🛠️ 개발', web: '🌐 브라우저·웹', data: '🗄️ 데이터', collab: '💬 협업', ai: '🧠 AI·유틸' };
-  const CATS_HAR = { workflow: '🔀 워크플로우', quality: '✅ 품질·리뷰', design: '🎨 디자인', domain: '🎮 도메인' };
+  const CATS_MCP = { dev: '🛠️ 개발', web: '🌐 브라우저·웹', data: '🗄️ 데이터', collab: '💬 협업', gamedev: '🎮 게임·언리얼' };
+  const CATS_HAR = { workflow: '🔀 워크플로우', design: '🎨 디자인', gamedev: '🎮 게임·언리얼', gamedesign: '📐 게임기획' };
   const TAGDEF = {
     pop: { cls: 'mcp-t-pop', txt: '⭐ 인기' }, env: { cls: 'mcp-t-env', txt: '🔑 env 필요' },
     free: { cls: 'mcp-t-free', txt: '✓ 즉시 설치' }, installed: { cls: 'mcp-t-done', txt: '● 설치됨' },
     plugin: { cls: 'mcp-t-plugin', txt: '🧩 플러그인' }, git: { cls: 'mcp-t-git', txt: '⿻ git clone' },
+    manual: { cls: 'mcp-t-manual', txt: '🛠 수동 설치' },
   };
 
   const curList = () => view === 'mcp' ? CATALOG.mcp : CATALOG.harness;
@@ -1711,11 +1714,18 @@ load();
 
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function isInstalled(m) { const a = instArr(); return a.includes(m.id) || a.includes(m.name); }
+  function docLink(m) {
+    if (!m.docs) return '';
+    const href = m.docsUrl || (/^[\w.-]+\.[a-z]{2,}(\/.*)?$/i.test(m.docs) ? 'https://' + m.docs : '');
+    if (href) return `<a class="mcp-doclink" href="${esc(href)}" target="_blank" rel="noopener noreferrer">📄 ${esc(m.docs)}</a>`;
+    return `<span class="mcp-doclink" style="cursor:default">📄 ${esc(m.docs)}</span>`;
+  }
 
   function tagsFor(m) {
     const t = [];
     if (m.popular) t.push('pop');
-    if (view === 'mcp') { (m.env && m.env.length) ? t.push('env') : t.push('free'); }
+    if (m.manual) t.push('manual');
+    else if (view === 'mcp') { (m.env && m.env.length) ? t.push('env') : t.push('free'); }
     else { (m.steps || []).some((s) => s.indexOf('/plugin') === 0) ? t.push('plugin') : t.push('git'); }
     if (isInstalled(m)) t.push('installed');
     return t;
@@ -1737,22 +1747,31 @@ load();
   function cardHtml(m) {
     const isMcp = view === 'mcp';
     const inst = isInstalled(m);
+    const isManual = !!m.manual;
     const tags = tagsFor(m).map((t) => `<span class="mcp-tag ${TAGDEF[t].cls}">${TAGDEF[t].txt}</span>`).join('');
-    const envHtml = (isMcp && m.env && m.env.length) ? `
-      <div class="mcp-envbox"><div class="mcp-eh">🔑 설치하려면 아래 값이 필요합니다</div>
-      ${m.env.map((e) => `<div class="mcp-envfield"><label>${esc(e.label || e.key)} <code style="color:var(--token)">${esc(e.key)}</code></label><input type="text" data-envkey="${esc(e.key)}" placeholder="값을 붙여넣으세요"><div class="mcp-help">${esc(e.help || '')}</div></div>`).join('')}
-      </div>` : '';
-    const kv = isMcp
-      ? `<div class="mcp-kv"><span class="mcp-k">명령</span><span><code>${esc(m.command)} ${esc((m.args || []).join(' '))}</code></span><span class="mcp-k">env</span><span>${(m.env && m.env.length) ? m.env.map((e) => '<code>' + esc(e.key) + '</code>').join(', ') : '<span style="color:#1a7f4b">불필요 — 즉시 설치</span>'}</span></div>`
-      : `<div class="mcp-fblbl">${(m.steps || []).some((s) => s.indexOf('/plugin') === 0) ? '설치 순서 (플러그인 → 실패 시 폴백):' : '설치:'}</div>`;
-    const cmd = isMcp ? mcpCmd(m) : harCmd(m);
+    let body;
+    if (isManual) {
+      // 딸깍 불가 — 수동 설치 안내만 표시(체크박스 비활성)
+      body = `<div class="mcp-envbox"><div class="mcp-eh">🛠 수동 설치 (딸깍 불가)</div><div class="mcp-manualnote">${esc(m.manualNote || '설치 방법은 docs를 참고하세요.').replace(/\n/g, '<br>')}</div></div>`;
+    } else if (isMcp) {
+      const envHtml = (m.env && m.env.length) ? `
+        <div class="mcp-envbox"><div class="mcp-eh">🔑 설치하려면 아래 값이 필요합니다</div>
+        ${m.env.map((e) => `<div class="mcp-envfield"><label>${esc(e.label || e.key)} <code style="color:var(--token)">${esc(e.key)}</code></label><input type="text" data-envkey="${esc(e.key)}" placeholder="값을 붙여넣으세요"><div class="mcp-help">${esc(e.help || '')}</div></div>`).join('')}
+        </div>` : '';
+      const kv = `<div class="mcp-kv"><span class="mcp-k">명령</span><span><code>${esc(m.command)} ${esc((m.args || []).join(' '))}</code></span><span class="mcp-k">env</span><span>${(m.env && m.env.length) ? m.env.map((e) => '<code>' + esc(e.key) + '</code>').join(', ') : '<span style="color:#1a7f4b">불필요 — 즉시 설치</span>'}</span></div>`;
+      body = `<div class="mcp-cmd">${mcpCmd(m)}</div>${kv}${envHtml}`;
+    } else {
+      const fblbl = `<div class="mcp-fblbl">${(m.steps || []).some((s) => s.indexOf('/plugin') === 0) ? '설치 순서 (플러그인 → 실패 시 폴백):' : '설치:'}</div>`;
+      body = `${fblbl}<div class="mcp-cmd">${harCmd(m)}</div>`;
+    }
+    const disabled = inst ? 'disabled title="이미 설치됨"' : (isManual ? 'disabled title="수동 설치 항목"' : '');
     return `<div class="mcp-card" data-id="${esc(m.id)}">
-      <div class="mcp-chead"><input class="mcp-chk" type="checkbox" ${inst ? 'disabled title="이미 설치됨"' : ''}>
+      <div class="mcp-chead"><input class="mcp-chk" type="checkbox" ${disabled}>
         <div class="mcp-namewrap"><div class="mcp-cname"><span class="mcp-logo ${isMcp ? '' : 'mcp-pl'}">${esc((m.name || '?').slice(0, 2).toUpperCase())}</span>${esc(m.name)}</div></div></div>
       <p class="mcp-cdesc">${esc(m.description)}</p>
       <div class="mcp-tags">${tags}</div>
       <div class="mcp-cfoot"><button class="mcp-details"><span class="mcp-arw">▸</span> 자세히 보기</button>${inst ? '<span class="mcp-instnote">✓ 사용 중</span>' : ''}</div>
-      <div class="mcp-detailx"><p>${esc(m.long || m.description)}</p>${isMcp ? '' : kv}<div class="mcp-cmd">${cmd}</div>${isMcp ? kv : ''}${envHtml}<a class="mcp-doclink" href="#" onclick="return false">📄 ${esc(m.docs)}</a></div>
+      <div class="mcp-detailx"><p>${esc(m.long || m.description)}</p>${body}${docLink(m)}</div>
     </div>`;
   }
   function render() {
