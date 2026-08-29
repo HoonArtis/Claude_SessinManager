@@ -146,6 +146,24 @@ const BOOT_COMMIT = (() => {
   return r.status === 0 ? r.stdout.trim() : null;
 })();
 
+// 업데이트를 받아올 원격 브랜치. 브랜치마다 배포가 갈리므로(master=Windows,
+// Use_Mac=macOS) origin/master를 박지 않고 현재 브랜치의 upstream을 따른다.
+const UPSTREAM = (() => {
+  const git = (args) => {
+    const r = spawnSync('git', args, { cwd: __dirname, windowsHide: true, encoding: 'utf8' });
+    return r.status === 0 ? r.stdout.trim() : null;
+  };
+  // 1순위: 설정된 upstream (git pull --ff-only가 실제로 당겨오는 대상과 동일)
+  const tracked = git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}']);
+  if (tracked) return tracked;
+  // 2순위: upstream 미설정이면 같은 이름의 origin 브랜치
+  const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (branch && branch !== 'HEAD' && git(['rev-parse', '--verify', `origin/${branch}`])) {
+    return `origin/${branch}`;
+  }
+  return null; // 추적 대상 없음 — 업데이트 확인을 건너뛴다
+})();
+
 // 부팅 직후 백그라운드로 원격 확인만 해둔다 (받을지는 사용자가 결정)
 setTimeout(() => {
   try {
@@ -447,7 +465,8 @@ const handler = async (req, res) => {
       };
       sendJson(res, 200, {
         commit: BOOT_COMMIT,
-        behind: count('HEAD..origin/master'),
+        upstream: UPSTREAM,
+        behind: UPSTREAM ? count(`HEAD..${UPSTREAM}`) : 0,
         restart: BOOT_COMMIT ? count(`${BOOT_COMMIT}..HEAD`) : 0,
         clients: aliveClients, // 서버를 붙잡고 있는 열린 탭 수
       });

@@ -12,7 +12,7 @@
 2. `setup.bat` 더블클릭 — 바탕화면에 "Claude 세션 매니저" 바로가기가
    생기고 바로 실행됩니다
 
-**macOS** (`MAC` 브랜치)
+**macOS** (`Use_Mac` 브랜치)
 
 1. 이 폴더를 원하는 위치에 복사
 2. `setup.command` 더블클릭 — 응용 프로그램에 "Claude 세션 매니저.app"이
@@ -104,3 +104,16 @@ node --test
 
 OS 의존 동작은 `lib/platform.js` 한 곳에 모여 있고 `process.platform`으로
 분기합니다. 자세한 내용은 `docs/superpowers/specs/2026-08-29-macos-port-design.md`.
+
+## 브랜치와 배포
+
+두 OS는 **별개로 배포**되며 서로 머지하지 않습니다.
+
+| 브랜치 | 대상 |
+|---|---|
+| `master` | Windows |
+| `Use_Mac` | macOS |
+
+앱 안의 [업데이트] 버튼은 `origin/master`가 아니라 **현재 브랜치의 upstream**을
+따라갑니다. 그래서 맥에서 받은 사본은 `origin/Use_Mac`만 보고, 윈도우 쪽
+변경사항이 잘못 딸려오지 않습니다.
