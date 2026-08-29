@@ -79,8 +79,8 @@
       "transport": "stdio", "command": "uvx", "args": ["verse-diagnostics-mcp"],
       "url": null, "headers": [],
       "env": [
-        { "key": "UEFN_LOG_PATH", "label": "UEFN 로그 경로", "help": "보통 C:/Users/사용자명/AppData/Local/UnrealEditorFortnite/Saved/Logs/UnrealEditorFortnite.log" },
-        { "key": "VERSE_PROJECT_ROOT", "label": "Verse 프로젝트 루트", "help": "예: C:/Users/사용자명/Documents/Fortnite Projects" }
+        { "key": "UEFN_LOG_PATH", "label": "UEFN 로그 경로", "help": "보통 C:/Users/사용자명/AppData/Local/UnrealEditorFortnite/Saved/Logs/UnrealEditorFortnite.log", "detect": "uefn_log" },
+        { "key": "VERSE_PROJECT_ROOT", "label": "Verse 프로젝트 루트 (Fortnite Projects 상위 폴더)", "help": "개별 프로젝트가 아니라 여러 프로젝트를 담는 'Fortnite Projects' 폴더. 로그에서 자동 감지됩니다.", "detect": "verse_project", "pick": "folder" }
       ]
     },
     {

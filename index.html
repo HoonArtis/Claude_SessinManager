@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Claude 세션 매니저</title>
 <style>
-  :root { --bg: #f6f7f9; --panel: #fff; --border: #e2e5ea; --text: #1c2128; --muted: #5c6470; --accent: #b5502e; --accent-deep: #97401f; --accent-soft: #f7e8e2; --time: #1d4ed8; --time-soft: #eff3fe; --token: #96470a; --token-soft: #fdf3e3; --danger: #c0392b; }
+  :root { --bg: #f6f7f9; --panel: #fff; --border: #e2e5ea; --text: #1c2128; --muted: #5c6470; --accent: #b5502e; --accent-deep: #97401f; --accent-soft: #f7e8e2; --time: #1d4ed8; --time-soft: #eff3fe; --token: #96470a; --token-soft: #fdf3e3; --danger: #c0392b; --carrot: #ed7117; --carrot-soft: #ffe8cc; --carrot-hover: #ffddb0; --carrot-deep: #9c4e0b; }
   * { box-sizing: border-box; }
   ::selection { background: var(--accent-soft); color: var(--text); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
@@ -37,11 +37,30 @@
 
   /* ===== MCP·하네스 카탈로그 오버레이 (모든 클래스 mcp- 접두어로 격리) ===== */
   #mcpOverlay { display: none; position: fixed; inset: 0; background: rgba(28,33,40,.45); z-index: 20; }
+  /* 패널 전체를 당근색 계열로 통일 — accent 토큰을 오버레이 안에서만 당근으로 재정의 (앱 전역 브랜드는 그대로) */
+  #mcpOverlay { --accent: #b8580a; --accent-deep: #8f430a; --accent-soft: #ffe8cc; }
   #mcpOverlay.open { display: flex; align-items: stretch; justify-content: center; }
-  .mcp-modal { position: relative; background: var(--bg); width: min(1000px, 100%); margin: 24px; border-radius: 14px; overflow-y: auto; box-shadow: 0 12px 48px rgba(0,0,0,.25); }
-  .mcp-close { position: absolute; top: 14px; right: 16px; z-index: 30; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 16px; color: var(--muted); cursor: pointer; }
+  .mcp-modal { position: relative; background: var(--bg); width: min(1000px, 100%); margin: 24px; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 48px rgba(0,0,0,.25); display: flex; flex-direction: column; }
+  .mcp-close { flex: none; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 16px; color: var(--muted); cursor: pointer; }
+  /* 상단바 / 본문(사이드바+메인) */
+  .mcp-topbar { flex: none; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .mcp-topbar h2 { font-size: 17px; margin: 0; white-space: nowrap; }
+  .mcp-body { flex: 1; display: flex; min-height: 0; }
+  .mcp-side { flex: none; width: 214px; border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .mcp-side .mcp-search { flex: none; min-width: 0; width: 100%; }
+  .mcp-sidelabel { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 6px 2px 2px; }
+  .mcp-catnav { display: flex; flex-direction: column; gap: 2px; }
+  .mcp-catitem { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font: inherit; font-size: 14px; color: var(--text); background: none; border: 0; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+  .mcp-catitem:hover { background: var(--bg); color: var(--accent); }
+  .mcp-catitem.on { background: var(--accent); color: #fff; }
+  .mcp-catitem .cnt { margin-left: auto; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .mcp-catitem.on .cnt { color: rgba(255,255,255,.85); }
+  .mcp-pullnote { margin-top: auto; font-size: 11px; color: var(--muted); line-height: 1.5; padding: 8px 2px 2px; }
+  .mcp-pullnote b { color: var(--accent-deep); }
+  .mcp-main { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 18px; background: var(--bg); }
+  #mcpGroups .mcp-group:first-child { margin-top: 0; }
   .mcp-close:hover { border-color: var(--danger); color: var(--danger); }
-  .mcp-wrap { padding: 22px 20px 130px; }
+  .mcp-wrap { flex: 1; overflow-y: auto; padding: 22px 20px 20px; }
   .mcp-top { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; padding-right: 44px; }
   .mcp-top h2 { font-size: 20px; margin: 0; }
   .mcp-sub { font-size: 13px; color: var(--muted); margin: 3px 0 0; }
@@ -63,18 +82,32 @@
   .mcp-chip:hover { border-color: var(--accent); color: var(--accent); }
   .mcp-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   .mcp-chip .mcp-n { font-size: 11px; opacity: .7; font-variant-numeric: tabular-nums; }
-  .mcp-group { margin-top: 24px; }
-  .mcp-grouph { display: flex; align-items: baseline; gap: 9px; margin: 0 2px 12px; }
-  .mcp-gt { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  /* 카테고리 = 하나의 박스(헤더 + 카드들이 한 덩어리) */
+  .mcp-group { margin-top: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); overflow: hidden; box-shadow: 0 1px 3px rgba(28,33,40,.04); }
+  .mcp-grouph { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--accent-soft); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; transition: background .12s; }
+  .mcp-grouph:hover { background: var(--carrot-hover); }
+  .mcp-group.mcp-collapsed .mcp-grouph { border-bottom-color: transparent; }
+  .mcp-gspace { flex: 1; }
+  .mcp-gchev { font-size: 13px; color: var(--accent-deep); width: 13px; text-align: center; transition: transform .15s; }
+  .mcp-group.mcp-collapsed .mcp-gchev { transform: rotate(-90deg); }
+  .mcp-gt { font-size: 12.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--accent-deep); white-space: nowrap; }
+  .mcp-gcount { font-size: 11px; color: var(--accent-deep); font-variant-numeric: tabular-nums; background: var(--panel); border: 1px solid rgba(181,86,10,.32); border-radius: 9px; padding: 1px 9px; }
   .mcp-gl { flex: 1; height: 1px; background: var(--border); }
-  .mcp-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; align-items: start; }
-  .mcp-card { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 15px 16px 14px; display: flex; flex-direction: column; gap: 9px; }
+  .mcp-grouplist { display: none; flex-wrap: wrap; gap: 6px; padding: 12px 14px; background: var(--bg); }
+  .mcp-group.mcp-collapsed .mcp-cards { display: none; }
+  .mcp-group.mcp-collapsed .mcp-grouplist { display: flex; }
+  .mcp-lpill { font-size: 12.5px; padding: 4px 11px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text); cursor: pointer; }
+  .mcp-lpill:hover { border-color: var(--accent); color: var(--accent); }
+  .mcp-lpill.inst { color: #1a7f4b; border-color: #bfe3cc; background: #f2faf5; }
+  .mcp-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; padding: 14px; background: var(--bg); }
+  .mcp-card { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 15px 16px 14px; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
   .mcp-card:hover { border-color: var(--accent); }
   .mcp-card.mcp-sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: linear-gradient(0deg, var(--accent-soft) 0%, var(--panel) 60%); }
   .mcp-chead { display: flex; align-items: flex-start; gap: 11px; }
   .mcp-chk { flex: none; width: 19px; height: 19px; margin-top: 2px; accent-color: var(--accent); cursor: pointer; }
   .mcp-namewrap { flex: 1; min-width: 0; }
-  .mcp-cname { font-size: 16px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
+  .mcp-cname { font-size: 16px; font-weight: 650; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .mcp-cname:hover { color: var(--accent); }
   .mcp-logo { width: 24px; height: 24px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-deep); font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex: none; }
   .mcp-logo.mcp-pl { background: #f0e9fb; color: #6d3bbf; }
   .mcp-cdesc { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 0; }
@@ -94,13 +127,15 @@
   .mcp-arw { transition: transform .15s; display: inline-block; }
   .mcp-card.mcp-open .mcp-arw { transform: rotate(90deg); }
   .mcp-instnote { font-size: 12px; color: #1a7f4b; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
-  .mcp-detailx { display: none; border-top: 1px dashed var(--border); margin-top: 3px; padding-top: 12px; flex-direction: column; gap: 11px; }
-  .mcp-card.mcp-open .mcp-detailx { display: flex; }
+  .mcp-detailx { display: none; border-top: 1px dashed var(--border); margin-top: 3px; padding-top: 12px; flex-direction: column; gap: 11px; min-width: 0; }
+  .mcp-card.mcp-open .mcp-detailx { display: flex; animation: mcpReveal .2s ease; transform-origin: top; }
+  @keyframes mcpReveal { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { .mcp-card.mcp-open .mcp-detailx { animation: none; } }
   .mcp-detailx p { margin: 0; font-size: 13px; color: var(--text); line-height: 1.6; }
   .mcp-kv { display: grid; grid-template-columns: 64px 1fr; gap: 4px 10px; font-size: 12.5px; }
   .mcp-kv .mcp-k { color: var(--muted); }
   .mcp-kv code, .mcp-cmd code { font-family: Consolas, 'Courier New', monospace; font-size: 12px; }
-  .mcp-cmd { background: #1c2128; color: #e8eaed; border-radius: 8px; padding: 9px 11px; font-family: Consolas, monospace; font-size: 12px; overflow-x: auto; white-space: pre; line-height: 1.7; }
+  .mcp-cmd { background: #1c2128; color: #e8eaed; border-radius: 8px; padding: 9px 11px; font-family: Consolas, monospace; font-size: 12px; overflow-x: auto; white-space: pre; line-height: 1.7; max-width: 100%; }
   .mcp-flag { color: #f0a56b; } .mcp-str { color: #8fd18f; } .mcp-cmt { color: #7a828c; }
   .mcp-fblbl { font-size: 11px; color: var(--muted); margin: 4px 0 -4px; }
   .mcp-doclink { font-size: 12.5px; color: var(--time); text-decoration: none; }
@@ -110,8 +145,17 @@
   .mcp-envfield label { font-size: 12px; color: var(--text); display: block; margin-bottom: 4px; font-weight: 600; }
   .mcp-envfield input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; font: inherit; font-size: 13px; background: var(--panel); }
   .mcp-envfield .mcp-help { font-size: 11px; color: var(--muted); margin-top: 3px; }
-  .mcp-bar { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--border); box-shadow: 0 -4px 20px rgba(28,33,40,.07); padding: 14px 20px; margin: 0 -20px -130px; transform: translateY(130%); transition: transform .2s ease; }
-  .mcp-bar.on { transform: none; }
+  .mcp-envrow { display: flex; gap: 6px; align-items: center; }
+  .mcp-envrow input { flex: 1; min-width: 0; }
+  .mcp-envbtn { flex: none; font: inherit; font-size: 12px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--muted); cursor: pointer; white-space: nowrap; }
+  .mcp-envbtn:hover { border-color: var(--accent); color: var(--accent); }
+  .mcp-envstatus { font-size: 11px; margin-top: 3px; min-height: 14px; }
+  .mcp-envstatus.ok { color: #1a7f4b; font-weight: 600; }
+  .mcp-envstatus.no { color: var(--token); }
+  .mcp-bar { flex: none; background: var(--panel); border-top: 1px solid var(--border); box-shadow: 0 -4px 20px rgba(28,33,40,.07); padding: 14px 20px; display: none; }
+  .mcp-bar.on { display: block; animation: mcpBarUp .2s ease; }
+  @keyframes mcpBarUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { .mcp-bar.on { animation: none; } }
   .mcp-inner { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
   .mcp-selcount { font-size: 14px; font-weight: 600; }
   .mcp-selcount b { color: var(--accent-deep); font-variant-numeric: tabular-nums; }
@@ -336,29 +380,29 @@
 </main>
 <div id="mcpOverlay" role="dialog" aria-modal="true" aria-label="MCP·하네스 카탈로그">
   <div class="mcp-modal">
-    <button id="mcpClose" class="mcp-close" aria-label="닫기">✕</button>
-    <div class="mcp-wrap">
-      <div class="mcp-top">
-        <div>
-          <h2 id="mcpH2">🧩 MCP · 하네스 카탈로그</h2>
-          <p class="mcp-sub">원하는 걸 골라 딸깍 설치. MCP 서버와 하네스·플러그인을 한 곳에서 셋업합니다.</p>
-        </div>
-        <div class="mcp-pull">출처: <b>catalog.json</b> · git pull로 최신화</div>
-      </div>
+    <div class="mcp-topbar">
+      <h2 id="mcpH2">🧩 MCP · 하네스</h2>
       <div class="mcp-views" id="mcpViews">
         <button class="on" data-view="mcp">🧩 MCP 서버 <span class="mcp-vn" id="mcpVnMcp">0</span></button>
         <button data-view="harness">⚙️ 하네스·플러그인 <span class="mcp-vn" id="mcpVnHar">0</span></button>
       </div>
-      <div class="mcp-controls">
-        <div class="mcp-searchrow">
-          <div class="mcp-search"><span class="mcp-ic">🔎</span><input id="mcpQ" type="text" placeholder="이름·설명 검색" autocomplete="off"></div>
-          <span class="mcp-cinst">설치됨 <b id="mcpInstCount">0</b> / <span id="mcpTotalCount">0</span></span>
-        </div>
-        <div class="mcp-chips" id="mcpChips"></div>
+      <div class="mcp-spacer"></div>
+      <button id="mcpClose" class="mcp-close" aria-label="닫기">✕</button>
+    </div>
+    <div class="mcp-body">
+      <aside class="mcp-side">
+        <div class="mcp-search"><span class="mcp-ic">🔎</span><input id="mcpQ" type="text" placeholder="이름·설명 검색" autocomplete="off"></div>
+        <div class="mcp-cinst">설치됨 <b id="mcpInstCount">0</b> / <span id="mcpTotalCount">0</span></div>
+        <div class="mcp-sidelabel">카테고리</div>
+        <nav class="mcp-catnav" id="mcpChips"></nav>
+        <div class="mcp-pullnote">출처: <b>catalog.json</b><br>git pull로 최신화</div>
+      </aside>
+      <div class="mcp-main">
+        <div id="mcpGroups"></div>
+        <div class="mcp-empty" id="mcpEmpty">검색 결과가 없습니다.</div>
       </div>
-      <div id="mcpGroups"></div>
-      <div class="mcp-empty" id="mcpEmpty">검색 결과가 없습니다.</div>
-      <div class="mcp-bar" id="mcpBar">
+    </div>
+    <div class="mcp-bar" id="mcpBar">
         <div class="mcp-inner">
           <div class="mcp-selcount"><span><b id="mcpSelN">0</b>개 선택됨</span><span class="mcp-warn" id="mcpEnvWarn" style="display:none">🔑 일부는 설치 전 키 입력이 필요합니다</span></div>
           <div class="mcp-scopewrap" id="mcpScopeWrap">설치 범위:
@@ -372,7 +416,6 @@
           <button class="mcp-clear" id="mcpClearBtn">선택 해제</button>
           <button class="mcp-install-btn" id="mcpInstallBtn">⬇ 선택한 <span id="mcpSelN2">0</span>개 설치</button>
         </div>
-      </div>
     </div>
   </div>
 </div>
@@ -1697,6 +1740,9 @@ load();
   let CATALOG = { mcp: [], harness: [], installed: { mcp: [], harness: [] } };
   let view = 'mcp', curCat = 'all', q = '';
   const selMcp = new Set(), selHar = new Set();
+  function loadCollapsed() { try { return new Set(JSON.parse(localStorage.getItem('csm-mcp-collapsed') || '[]')); } catch { return new Set(); } }
+  function saveCollapsed() { try { localStorage.setItem('csm-mcp-collapsed', JSON.stringify([...collapsed])); } catch {} }
+  const collapsed = loadCollapsed();
 
   const CATS_MCP = { dev: '🛠️ 개발', web: '🌐 브라우저·웹', data: '🗄️ 데이터', collab: '💬 협업', gamedev: '🎮 게임·언리얼' };
   const CATS_HAR = { workflow: '🔀 워크플로우', design: '🎨 디자인', gamedev: '🎮 게임·언리얼', gamedesign: '📐 게임기획' };
@@ -1756,7 +1802,16 @@ load();
     } else if (isMcp) {
       const envHtml = (m.env && m.env.length) ? `
         <div class="mcp-envbox"><div class="mcp-eh">🔑 설치하려면 아래 값이 필요합니다</div>
-        ${m.env.map((e) => `<div class="mcp-envfield"><label>${esc(e.label || e.key)} <code style="color:var(--token)">${esc(e.key)}</code></label><input type="text" data-envkey="${esc(e.key)}" placeholder="값을 붙여넣으세요"><div class="mcp-help">${esc(e.help || '')}</div></div>`).join('')}
+        ${m.env.map((e) => `<div class="mcp-envfield" data-key="${esc(e.key)}">
+          <label>${esc(e.label || e.key)} <code style="color:var(--token)">${esc(e.key)}</code></label>
+          <div class="mcp-envrow">
+            <input type="text" data-envkey="${esc(e.key)}" placeholder="값을 붙여넣으세요">
+            ${e.detect ? `<button type="button" class="mcp-envbtn" data-act="detect" data-target="${esc(m.id)}" data-key="${esc(e.key)}">🔍 자동</button>` : ''}
+            ${e.pick === 'folder' ? `<button type="button" class="mcp-envbtn" data-act="pick" data-key="${esc(e.key)}">📁 찾기</button>` : ''}
+          </div>
+          <div class="mcp-help">${esc(e.help || '')}</div>
+          <div class="mcp-envstatus" data-key="${esc(e.key)}"></div>
+        </div>`).join('')}
         </div>` : '';
       const kv = `<div class="mcp-kv"><span class="mcp-k">명령</span><span><code>${esc(m.command)} ${esc((m.args || []).join(' '))}</code></span><span class="mcp-k">env</span><span>${(m.env && m.env.length) ? m.env.map((e) => '<code>' + esc(e.key) + '</code>').join(', ') : '<span style="color:#1a7f4b">불필요 — 즉시 설치</span>'}</span></div>`;
       body = `<div class="mcp-cmd">${mcpCmd(m)}</div>${kv}${envHtml}`;
@@ -1782,7 +1837,14 @@ load();
     for (const c of cats) {
       const items = list.filter((m) => m.category === c);
       if (!items.length) continue;
-      html += `<div class="mcp-group"><div class="mcp-grouph"><span class="mcp-gt">${curCats()[c]}</span><span class="mcp-gl"></span></div><div class="mcp-cards">${items.map(cardHtml).join('')}</div></div>`;
+      const key = view + ':' + c;
+      const isCol = collapsed.has(key) && !q && curCat === 'all'; // 접힘은 '전체'에서만 — 특정 카테고리 선택 시엔 항상 펼침
+      const pills = items.map((m) => `<span class="mcp-lpill${isInstalled(m) ? ' inst' : ''}" data-id="${esc(m.id)}">${esc(m.name)}</span>`).join('');
+      html += `<div class="mcp-group${isCol ? ' mcp-collapsed' : ''}" data-key="${esc(key)}">
+        <div class="mcp-grouph"><span class="mcp-gchev">▾</span><span class="mcp-gt">${curCats()[c]}</span><span class="mcp-gspace"></span><span class="mcp-gcount">${items.length}</span></div>
+        <div class="mcp-cards">${items.map(cardHtml).join('')}</div>
+        <div class="mcp-grouplist">${pills}</div>
+      </div>`;
     }
     $('mcpGroups').innerHTML = html;
     $('mcpEmpty').style.display = list.length ? 'none' : 'block';
@@ -1790,14 +1852,43 @@ load();
   }
   function renderChips() {
     const cats = curCats(), all = curList(), a = instArr();
-    let h = `<button class="mcp-chip on" data-cat="all">전체 <span class="mcp-n">${all.length}</span></button>`;
-    for (const c in cats) h += `<button class="mcp-chip" data-cat="${c}">${cats[c]} <span class="mcp-n">${all.filter((m) => m.category === c).length}</span></button>`;
+    let h = `<button class="mcp-catitem${curCat === 'all' ? ' on' : ''}" data-cat="all">전체 <span class="cnt">${all.length}</span></button>`;
+    for (const c in cats) h += `<button class="mcp-catitem${curCat === c ? ' on' : ''}" data-cat="${c}">${cats[c]} <span class="cnt">${all.filter((m) => m.category === c).length}</span></button>`;
     $('mcpChips').innerHTML = h;
     $('mcpInstCount').textContent = all.filter((m) => a.includes(m.id) || a.includes(m.name)).length;
     $('mcpTotalCount').textContent = all.length;
   }
+  async function detectEnv(target) {
+    try { const r = await fetch('/api/detect-env?target=' + encodeURIComponent(target)); return await r.json(); } catch { return {}; }
+  }
+  async function autofillCard(card) {
+    const detBtn = card.querySelector('.mcp-envbtn[data-act="detect"]');
+    if (!detBtn) return;
+    const res = await detectEnv(detBtn.dataset.target);
+    card.querySelectorAll('.mcp-envfield').forEach((field) => {
+      const r = res[field.dataset.key];
+      const input = field.querySelector('input');
+      const status = field.querySelector('.mcp-envstatus');
+      if (!input || !status) return;
+      if (r && r.found && !input.value) { input.value = r.value; status.textContent = '✓ 자동 감지됨'; status.className = 'mcp-envstatus ok'; }
+      else if (r && !r.found && !input.value) { status.textContent = '✗ 자동 감지 실패 — 직접 입력하거나 📁 찾기'; status.className = 'mcp-envstatus no'; }
+    });
+  }
+  function openCard(card) {
+    if (card.classList.contains('mcp-open')) return;
+    card.classList.add('mcp-open');
+    if (!card.dataset.detected && card.querySelector('.mcp-envbtn[data-act="detect"]')) {
+      card.dataset.detected = '1';
+      autofillCard(card);
+    }
+  }
+  function toggleCard(card) {
+    if (card.classList.contains('mcp-open')) { card.classList.remove('mcp-open'); return; }
+    openCard(card);
+  }
   function wire() {
-    overlay.querySelectorAll('.mcp-details').forEach((b) => { b.onclick = () => b.closest('.mcp-card').classList.toggle('mcp-open'); });
+    overlay.querySelectorAll('.mcp-details').forEach((b) => { b.onclick = () => toggleCard(b.closest('.mcp-card')); });
+    overlay.querySelectorAll('.mcp-cname').forEach((el) => { el.onclick = () => toggleCard(el.closest('.mcp-card')); });
     overlay.querySelectorAll('.mcp-chk').forEach((chk) => {
       const card = chk.closest('.mcp-card'), id = card.dataset.id, S = curSel();
       chk.checked = S.has(id);
@@ -1848,16 +1939,55 @@ load();
     renderChips(); render();
   };
   $('mcpChips').onclick = (e) => {
-    const c = e.target.closest('.mcp-chip'); if (!c) return;
-    $('mcpChips').querySelectorAll('.mcp-chip').forEach((x) => x.classList.remove('on'));
+    const c = e.target.closest('.mcp-catitem'); if (!c) return;
+    $('mcpChips').querySelectorAll('.mcp-catitem').forEach((x) => x.classList.remove('on'));
     c.classList.add('on'); curCat = c.dataset.cat; render();
   };
+  // 그룹 접기/펼치기 (헤더 클릭) + 접힌 리스트에서 알약 클릭 시 그 그룹 펼치기
+  $('mcpGroups').addEventListener('click', (e) => {
+    const pill = e.target.closest('.mcp-lpill');
+    if (pill) {
+      const g = pill.closest('.mcp-group');
+      collapsed.delete(g.dataset.key); saveCollapsed();
+      g.classList.remove('mcp-collapsed');
+      const sel = (window.CSS && CSS.escape) ? CSS.escape(pill.dataset.id) : pill.dataset.id;
+      const card = g.querySelector('.mcp-card[data-id="' + sel + '"]');
+      if (card) { openCard(card); card.scrollIntoView({ block: 'nearest' }); }
+      return;
+    }
+    const head = e.target.closest('.mcp-grouph');
+    if (head) {
+      const g = head.closest('.mcp-group');
+      if (g.classList.toggle('mcp-collapsed')) collapsed.add(g.dataset.key); else collapsed.delete(g.dataset.key);
+      saveCollapsed();
+    }
+  });
   $('mcpQ').oninput = (e) => { q = e.target.value.trim().toLowerCase(); render(); };
   $('mcpClearBtn').onclick = () => { curSel().clear(); render(); };
   $('mcpScopeSeg').onclick = (e) => {
     const b = e.target.closest('button'); if (!b) return;
     $('mcpScopeSeg').querySelectorAll('button').forEach((x) => x.classList.remove('on')); b.classList.add('on');
   };
+  // env 자동 감지 / 폴더 찾기 버튼 (위임)
+  overlay.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.mcp-envbtn'); if (!btn) return;
+    const field = btn.closest('.mcp-envfield');
+    const input = field.querySelector('input');
+    const status = field.querySelector('.mcp-envstatus');
+    if (btn.dataset.act === 'detect') {
+      status.textContent = '감지 중…'; status.className = 'mcp-envstatus';
+      const res = await detectEnv(btn.dataset.target);
+      const r = res[btn.dataset.key];
+      if (r && r.found) { input.value = r.value; status.textContent = '✓ 자동 감지됨'; status.className = 'mcp-envstatus ok'; }
+      else { status.textContent = '✗ 못 찾음 — 직접 입력하거나 📁 찾기'; status.className = 'mcp-envstatus no'; }
+    } else if (btn.dataset.act === 'pick') {
+      try {
+        const r = await fetch('/api/pick-folder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const j = await r.json();
+        if (!j.cancelled && j.path) { input.value = j.path; status.textContent = '✓ 선택됨'; status.className = 'mcp-envstatus ok'; }
+      } catch {}
+    }
+  });
   $('mcpInstallBtn').onclick = async () => {
     const S = curSel(); if (!S.size) return;
     const btn = $('mcpInstallBtn'), orig = btn.innerHTML;

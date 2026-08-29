@@ -13,6 +13,7 @@ const { buildLaunchArgs, readDefaultFolder, withDefaultFolder } = require('./lib
 const { parseSession, extractUserPrompts, extractConversation, extractConversationFull } = require('./lib/parse-session');
 const { buildHandoffMd } = require('./lib/handoff');
 const { loadCatalog, buildMcpAddArgs, buildHarnessPrompt, parseInstalledMcps, parseInstalledPlugins } = require('./lib/mcp-catalog');
+const { uefnLogPath, parseVerseProjectRoot } = require('./lib/uefn-detect');
 
 const SAFE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
 
@@ -969,6 +970,23 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/api/installed') {
       if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
       sendJson(res, 200, detectInstalled());
+      return;
+    }
+    if (req.method === 'GET' && req.url.startsWith('/api/detect-env')) {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      const target = new URL(req.url, 'http://localhost').searchParams.get('target');
+      const out = {};
+      if (target === 'verse-diagnostics') {
+        const logPath = uefnLogPath({ localAppData: process.env.LOCALAPPDATA, homedir: os.homedir() });
+        const logFound = !!(logPath && fs.existsSync(logPath));
+        out.UEFN_LOG_PATH = { value: logFound ? logPath : '', found: logFound };
+        let root = '';
+        if (logFound) {
+          try { root = parseVerseProjectRoot(fs.readFileSync(logPath, 'utf8')) || ''; } catch {}
+        }
+        out.VERSE_PROJECT_ROOT = { value: root, found: !!root };
+      }
+      sendJson(res, 200, out);
       return;
     }
     if (req.method === 'POST' && req.url === '/api/mcp-install') {
