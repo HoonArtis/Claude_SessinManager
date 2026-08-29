@@ -202,7 +202,7 @@ function scheduleShutdown(ms) {
   }, ms);
 }
 
-const server = http.createServer(async (req, res) => {
+const handler = async (req, res) => {
   try {
     // 외부(로컬망)에서 온 요청은 공유 비밀키가 맞아야만 통과.
     // 예외: /api/pair-request 는 페어링 코드로 자체 검증한다.
@@ -806,9 +806,21 @@ const server = http.createServer(async (req, res) => {
     console.error(err);
     sendJson(res, 500, { error: err.message });
   }
-});
+};
+
+const server = http.createServer(handler);
 
 // 원격 기능이 켜져 있으면 로컬망에도 연다 (외부 요청은 공유 키 인증 필수)
 server.listen(PORT, REMOTE_ON ? '0.0.0.0' : '127.0.0.1', () => {
   console.log(`Claude 세션 매니저: http://localhost:${PORT}` + (REMOTE_ON ? ` (원격 켜짐: ${MY_NAME})` : ''));
 });
+
+// macOS(및 일부 리눅스)의 브라우저는 localhost를 IPv6 ::1로 먼저 해석한다.
+// 127.0.0.1만 잡고 있으면 주소창에 localhost를 넣었을 때 연결이 실패하므로
+// 루프백 전용 모드에서는 ::1도 함께 듣는다. 외부 노출은 그대로 없다.
+if (!REMOTE_ON) {
+  const v6 = http.createServer(handler);
+  v6.on('error', () => {}); // IPv6가 없는 환경이면 조용히 넘어간다
+  v6.listen(PORT, '::1');
+  server.on('close', () => v6.close());
+}
