@@ -187,12 +187,20 @@
       "fallback": []
     },
     {
-      "id": "game-design-skill", "name": "GDD Methodology", "category": "gamedesign", "popular": false,
-      "description": "소스 기반 게임 디자인 방법론(GDD 작성)",
-      "long": "Claude-Code-Game-Studios에서 정제한 소스 기반 게임 디자인 방법론 스킬입니다. 게임 기둥(pillar), 코어 루프, 측정 가능한 메카닉을 정의하는 절차를 따라 체계적인 게임 디자인 문서(GDD)를 만들도록 안내합니다. 같은 마켓플레이스에 ai-native-game-design 스킬도 함께 있어 필요 시 추가할 수 있습니다.",
+      "id": "game-design-skill", "name": "Game Design (방법론)", "category": "gamedesign", "popular": false,
+      "description": "게임 디자인 방법론 가이드 — 컨셉·루프·GDD·밸런스 (개발용)",
+      "long": "개발 단계에서 Claude에게 소스 기반 게임 디자인 지식을 심어주는 '설계 가이드' 스킬입니다(게임 안에서 도는 런타임 도구가 아님). 컨셉 발상, 게임 기둥(pillar), 코어 루프, 시스템 분해, GDD 작성, 공식·튜닝 노브, 밸런스·경제 분석, 프로토타이핑, 플레이테스트 해석, UX·접근성·스코프 관리, 설계 변경 전파, 문서 리뷰까지 게임 디자인 전반을 다룹니다.",
       "docs": "github.com/JupiterTheWarlock/game-design-skill",
       "steps": ["/plugin marketplace add JupiterTheWarlock/game-design-skill", "/plugin install game-design-skill@game-design-skill"],
-      "fallback": ["/plugin install ai-native-game-design@game-design-skill"]
+      "fallback": []
+    },
+    {
+      "id": "ai-native-game-design", "name": "AI-Native Game Design", "category": "gamedesign", "popular": false,
+      "description": "런타임 AI를 쓰는 'AI-네이티브 게임' 설계·리뷰 스킬 (개발용)",
+      "long": "출시된 게임 안에서 런타임 AI가 플레이어의 표현을 해석하거나, 콘텐츠·규칙을 생성하고, 결과를 판정하거나, 지능적 캐릭터·관계를 유지하는 'AI-네이티브 게임'을 어떻게 설계·리뷰할지 돕는 개발용 가이드 스킬입니다. 플레이어-AI 인터페이스, 경계 있는 생성(bounded generation), 게임 상태 권한, 캐릭터 기억·연속성, 실패 복구, AI 동료, 멀티에이전트 사회, 오픈 내러티브, 안전·프라이버시 요건 등을 다룹니다. 게임에 AI를 넣어주는 런타임 도구가 아니라, 그런 게임의 '설계'를 돕는 스킬입니다.",
+      "docs": "github.com/JupiterTheWarlock/game-design-skill",
+      "steps": ["/plugin marketplace add JupiterTheWarlock/game-design-skill", "/plugin install ai-native-game-design@game-design-skill"],
+      "fallback": []
     }
   ]
 }
