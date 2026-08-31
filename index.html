@@ -1744,7 +1744,7 @@ load();
   function saveCollapsed() { try { localStorage.setItem('csm-mcp-collapsed', JSON.stringify([...collapsed])); } catch {} }
   const collapsed = loadCollapsed();
 
-  const CATS_MCP = { dev: '🛠️ 개발', web: '🌐 브라우저·웹', data: '🗄️ 데이터', collab: '💬 협업', gamedev: '🎮 게임·언리얼' };
+  const CATS_MCP = { dev: '🛠️ 개발', vcs: '🔀 버전관리', web: '🌐 브라우저·웹', data: '🗄️ 데이터', collab: '💬 협업', gamedev: '🎮 게임·언리얼' };
   const CATS_HAR = { workflow: '🔀 워크플로우', design: '🎨 디자인', gamedev: '🎮 게임·언리얼', gamedesign: '📐 게임기획' };
   const TAGDEF = {
     pop: { cls: 'mcp-t-pop', txt: '⭐ 인기' }, env: { cls: 'mcp-t-env', txt: '🔑 env 필요' },

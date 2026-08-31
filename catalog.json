@@ -72,6 +72,20 @@
       "env": [{ "key": "NOTION_TOKEN", "label": "Notion Integration Token", "help": "notion.so/my-integrations 에서 발급 후, 쓰려는 페이지 우측 ⋯ → 연결에 추가" }]
     },
     {
+      "id": "perforce", "name": "Perforce (P4)", "category": "vcs", "popular": true,
+      "description": "P4 파일·체인지리스트·셸브·워크스페이스·스트림 조작",
+      "long": "Perforce(P4, Helix Core) 버전관리에 Claude가 연결해 파일 조회·제출, 체인지리스트·셸브·워크스페이스·잡·리뷰·스트림을 다루게 해줍니다. 언리얼 등 대형 게임 프로젝트가 표준으로 쓰는 VCS라 UE 작업과 궁합이 좋습니다. uvx로 바로 설치되고 기본은 --readonly로 안전하게 시작합니다. 접속 정보(P4PORT/P4USER 등)를 env로 지정하며, 인증은 보통 'p4 login' 티켓을 쓰고 필요 시 P4PASSWD로 대체합니다.",
+      "docs": "github.com/perforce/p4mcp-server",
+      "transport": "stdio", "command": "uvx", "args": ["p4mcp-server", "--readonly", "--allow-usage"],
+      "url": null, "headers": [],
+      "env": [
+        { "key": "P4PORT", "label": "P4 서버 주소", "help": "예: ssl:perforce.example.com:1666" },
+        { "key": "P4USER", "label": "P4 사용자명", "help": "Perforce 계정 아이디" },
+        { "key": "P4CLIENT", "label": "워크스페이스명 (권장)", "help": "P4 워크스페이스(client) 이름. 없으면 비워도 됨" },
+        { "key": "P4PASSWD", "label": "비밀번호 (선택)", "help": "티켓 인증(p4 login) 대신 쓸 때만. 보통 비워두고 p4 login 사용" }
+      ]
+    },
+    {
       "id": "verse-diagnostics", "name": "Verse Diagnostics", "category": "gamedev", "popular": false,
       "description": "UEFN Verse 빌드 에러를 구조화해 Claude에 전달",
       "long": "UEFN의 UnrealEditorFortnite.log를 파싱해 Verse 컴파일·빌드 진단(에러·경고)을 구조화된 데이터로 Claude에 넘겨줍니다. \"방금 Verse 빌드 왜 실패했는지 봐줘\" 같은 요청에서 로그를 직접 읽어 원인과 위치를 짚어줍니다. uvx로 바로 설치되며(파이썬 uv 필요), 로그 파일 경로와 프로젝트 루트를 env로 지정해야 동작합니다. UEFN은 Verse 컴파일 결과가 로그로만 남기 때문에, 이 MCP가 있으면 빌드 오류 디버깅이 훨씬 매끄럽습니다.",
