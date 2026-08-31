@@ -9,7 +9,7 @@
       "url": null, "headers": [], "env": []
     },
     {
-      "id": "git", "name": "Git", "category": "dev", "popular": false,
+      "id": "git", "name": "Git", "category": "vcs", "popular": false,
       "description": "로컬 저장소의 커밋·diff·로그 조작",
       "long": "로컬 git 저장소를 Claude가 다루게 해줍니다. status·diff·log 조회부터 스테이징·커밋·브랜치 작업까지, GitHub 없이 내 컴퓨터의 저장소만으로 동작합니다. \"방금 바뀐 것 diff 보여줘\", \"이 변경 커밋해줘\" 같은 흐름에 적합합니다. Python 도구 실행기 uvx가 설치돼 있어야 합니다(uv 패키지).",
       "docs": "github.com/modelcontextprotocol/servers",
