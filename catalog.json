@@ -169,18 +169,17 @@
         "파일 조회·제출, 체인지리스트·셸브 관리",
         "워크스페이스·잡·리뷰·스트림 조작",
         "언리얼 등 대형 게임 프로젝트의 표준 VCS",
-        "이 카탈로그는 --readonly로 설치 — 쓰기 차단, 서버 기본값은 아님",
-        "--allow-usage 포함 — 익명 사용통계 전송에 동의하는 플래그",
-        "접속 정보(P4PORT·P4USER 등) env 지정",
-        "인증은 p4 login 티켓, 필요 시 P4PASSWD"
+        "--readonly로 설치 — 쓰기 차단",
+        "기존 P4 환경(p4 set·P4CONFIG)이 있으면 입력 없이 그대로 사용",
+        "설치 후 터미널에서 p4 login -a 를 자동 실행해 티켓 발급",
+        "비밀번호는 받지도, 설정에 저장하지도 않음"
       ],
       "docs": "github.com/perforce/p4mcp-server",
       "transport": "stdio",
       "command": "uvx",
       "args": [
         "p4mcp-server",
-        "--readonly",
-        "--allow-usage"
+        "--readonly"
       ],
       "url": null,
       "headers": [],
@@ -188,24 +187,24 @@
         {
           "key": "P4PORT",
           "label": "P4 서버 주소",
-          "help": "예: ssl:perforce.example.com:1666"
+          "help": "예: ssl:perforce.example.com:1666 — p4 set·P4CONFIG에 이미 있으면 비워두세요"
         },
         {
           "key": "P4USER",
           "label": "P4 사용자명",
-          "help": "Perforce 계정 아이디"
+          "help": "Perforce 계정 아이디 — p4 set·P4CONFIG에 이미 있으면 비워두세요"
         },
         {
           "key": "P4CLIENT",
           "label": "워크스페이스명 (권장)",
-          "help": "P4 워크스페이스(client) 이름. 없으면 비워도 됨"
-        },
-        {
-          "key": "P4PASSWD",
-          "label": "비밀번호 (선택)",
-          "help": "티켓 인증(p4 login) 대신 쓸 때만. 보통 비워두고 p4 login 사용"
+          "help": "P4 워크스페이스(client) 이름. 없으면 비워도 됨 — p4 set·P4CONFIG에 이미 있으면 비워두세요"
         }
-      ]
+      ],
+      "envOptional": true,
+      "postInstall": {
+        "cmd": "p4 login -a",
+        "label": "Perforce 로그인 티켓 발급"
+      }
     },
     {
       "id": "verse-diagnostics",
