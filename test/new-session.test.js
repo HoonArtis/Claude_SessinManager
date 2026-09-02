@@ -58,3 +58,18 @@ test('wt 없음: 명령이 없으면 cd만 하고 셸을 남긴다', () => {
   const { args } = buildLaunchArgs({ cwd: 'C:/w', command: null, mode: 'tab', hasWt: false });
   assert.strictEqual(args[args.length - 1], 'cd /d "C:/w"');
 });
+
+// 회귀: 하네스 설치 프롬프트가 6줄이라 cmd /k 인자에 넣으면 첫 줄만 전달되고
+// "무엇을 설치할지"가 사라졌다. 이제 조용히 깨지지 않고 즉시 실패한다.
+test('여러 줄 명령은 거부한다 — 줄바꿈은 명령줄에서 잘려 나간다', () => {
+  const multi = 'claude "설치해줘\n  - /plugin install superpowers@superpowers-marketplace"';
+  assert.throws(() => buildLaunchArgs({ cwd: 'C:\w', command: multi, mode: 'tab', hasWt: true }), /줄바꿈/);
+  assert.throws(() => buildLaunchArgs({ cwd: 'C:\w', command: 'a\rb', mode: 'tab', hasWt: false }), /줄바꿈/);
+});
+
+test('한 줄 명령은 그대로 통과한다', () => {
+  const one = 'claude "C:\Temp\csm-install\harness-1.md 파일을 읽고 그 안의 지시대로 실행해줘"';
+  const { args } = buildLaunchArgs({ cwd: 'C:\w', command: one, mode: 'tab', hasWt: true });
+  assert.ok(args.includes(one));
+  assert.ok(!args.some((a) => /[\r\n]/.test(a)));
+});
