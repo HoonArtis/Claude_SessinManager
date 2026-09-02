@@ -41,7 +41,7 @@
   #mcpOverlay { --accent: #b8580a; --accent-deep: #8f430a; --accent-soft: #ffe8cc; }
   #mcpOverlay.open { display: flex; align-items: stretch; justify-content: center; }
   /* calc로 margin을 빼야 좁은 화면에서 모달이 뷰포트 밖으로 밀려나지 않는다 */
-  .mcp-modal { position: relative; background: var(--bg); width: min(1240px, calc(100% - 48px)); margin: 24px; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 48px rgba(0,0,0,.25); display: flex; flex-direction: column; }
+  .mcp-modal { position: relative; background: var(--bg); width: min(1600px, calc(100% - 32px)); margin: 16px; border-radius: 14px; overflow: hidden; box-shadow: 0 12px 48px rgba(0,0,0,.25); display: flex; flex-direction: column; }
   .mcp-close { flex: none; width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); font-size: 16px; color: var(--muted); cursor: pointer; }
   /* 상단바 / 본문(사이드바+메인) */
   .mcp-topbar { flex: none; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel); }
@@ -59,15 +59,18 @@
   .mcp-pullnote { margin-top: auto; font-size: 11px; color: var(--muted); line-height: 1.5; padding: 8px 2px 2px; }
   .mcp-pullnote b { color: var(--accent-deep); }
   .mcp-main { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 18px; background: var(--bg); }
-  /* ── 우측 상세 패널 (마스터-디테일): 카드 격자는 고정, 상세만 교체 ── */
-  .mcp-detailpane { flex: none; width: 360px; border-left: 1px solid var(--border); background: var(--panel); overflow-y: auto; display: flex; flex-direction: column; }
+  /* ── 상세: 카드 격자 위에 뜨는 가운데 오버레이. 좌우 3분할을 쓰지 않아 격자가 화면 전체를 쓴다 ── */
+  .mcp-dback { position: absolute; inset: 0; background: rgba(28,33,40,.38); z-index: 3; }
+  .mcp-detailpane { position: absolute; z-index: 4; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(620px, calc(100% - 48px)); max-height: calc(100% - 48px);
+    background: var(--panel); border-radius: 14px; box-shadow: 0 18px 60px rgba(28,33,40,.30);
+    overflow-y: auto; display: flex; flex-direction: column; }
+  .mcp-dback.mcp-dnone, .mcp-detailpane.mcp-dnone { display: none; }
   .mcp-dhead { flex: none; display: flex; align-items: flex-start; gap: 10px; padding: 15px 16px 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--panel); z-index: 1; }
   .mcp-dtitle { flex: 1; min-width: 0; font-size: 16px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
   .mcp-dclose { flex: none; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 7px; background: var(--bg); color: var(--muted); font-size: 13px; cursor: pointer; }
   .mcp-dclose:hover { border-color: var(--accent); color: var(--accent); }
-  .mcp-dbody { padding: 14px 16px 22px; }
-  .mcp-dempty { margin: auto; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.7; padding: 24px; }
-  .mcp-dempty .mcp-dicon { display: block; font-size: 30px; margin-bottom: 10px; opacity: .45; }
+  .mcp-dbody { padding: 16px 20px 22px; }
   #mcpGroups .mcp-group:first-child { margin-top: 0; }
   .mcp-close:hover { border-color: var(--danger); color: var(--danger); }
   .mcp-wrap { flex: 1; overflow-y: auto; padding: 22px 20px 20px; }
@@ -109,9 +112,11 @@
   .mcp-lpill { font-size: 12.5px; padding: 4px 11px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text); cursor: pointer; }
   .mcp-lpill:hover { border-color: var(--accent); color: var(--accent); }
   .mcp-lpill.inst { color: #1a7f4b; border-color: #bfe3cc; background: #f2faf5; }
-  .mcp-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; padding: 14px; background: var(--bg); }
-  .mcp-card { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 15px 16px 14px; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+  /* 폭에 따라 열 수가 늘어난다 — 넓은 화면에서 카드가 좁게 눌리지 않도록 */
+  .mcp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; align-items: start; padding: 14px; background: var(--bg); }
+  .mcp-card { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; cursor: pointer; }
   .mcp-card:hover { border-color: var(--accent); }
+  .mcp-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .mcp-card.mcp-sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: linear-gradient(0deg, var(--accent-soft) 0%, var(--panel) 60%); }
   /* '보는 중'은 바깥 outline, '설치 선택됨'(mcp-sel)은 안쪽 링 — 둘이 겹쳐도 구분된다 */
   .mcp-card.mcp-open { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -133,12 +138,6 @@
   .mcp-tag.mcp-t-git { color: var(--muted); background: var(--bg); border: 1px solid var(--border); }
   .mcp-tag.mcp-t-manual { color: #8a5a00; background: #fbeccd; }
   .mcp-manualnote { font-size: 12.5px; line-height: 1.8; color: var(--text); font-family: Consolas, 'Courier New', monospace; }
-  .mcp-cfoot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
-  .mcp-details { font: inherit; font-size: 12.5px; color: var(--muted); background: none; border: 0; cursor: pointer; padding: 4px 0; display: inline-flex; align-items: center; gap: 4px; }
-  .mcp-details:hover { color: var(--accent); }
-  .mcp-arw { transition: transform .15s; display: inline-block; }
-  .mcp-card.mcp-open .mcp-arw { transform: rotate(90deg); }
-  .mcp-instnote { font-size: 12px; color: #1a7f4b; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
   .mcp-detailx { display: flex; flex-direction: column; gap: 12px; min-width: 0; animation: mcpReveal .18s ease; }
   @keyframes mcpReveal { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: translateY(0); } }
   @media (prefers-reduced-motion: reduce) { .mcp-detailx { animation: none; } }
@@ -186,12 +185,7 @@
   .mcp-clear { font: inherit; font-size: 13px; color: var(--muted); background: none; border: 0; cursor: pointer; }
   .mcp-clear:hover { color: var(--danger); }
   .mcp-empty { display: none; text-align: center; color: var(--muted); padding: 50px 0; font-size: 14px; }
-  /* 3컬럼(사이드바+카드+상세)이 안 들어가는 폭에서는 상세를 카드 위로 덮는 드로어로 전환 */
-  @media (max-width: 1180px) {
-    .mcp-detailpane { position: absolute; top: 0; right: 0; bottom: 0; width: min(360px, 100%); box-shadow: -8px 0 28px rgba(28,33,40,.16); z-index: 2; }
-    .mcp-detailpane.mcp-dnone { display: none; } /* 넓을 땐 안내문을 띄우지만 드로어일 땐 카드를 가리지 않게 완전히 숨긴다 */
-  }
-  @media (max-width: 720px) { .mcp-cards { grid-template-columns: 1fr; } .mcp-detailpane { width: 100%; } }
+  @media (max-width: 720px) { .mcp-cards { grid-template-columns: 1fr; } }
   #filterBar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--border); }
   .chips { display: flex; gap: 4px; }
   .chip { min-height: 36px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 18px; background: var(--panel); font-size: 15px; color: var(--muted); cursor: pointer; }
@@ -421,8 +415,9 @@
         <div id="mcpGroups"></div>
         <div class="mcp-empty" id="mcpEmpty">검색 결과가 없습니다.</div>
       </div>
-      <aside class="mcp-detailpane mcp-dnone" id="mcpDetail" aria-live="polite"></aside>
     </div>
+    <div class="mcp-dback mcp-dnone" id="mcpDetailBack"></div>
+    <aside class="mcp-detailpane mcp-dnone" id="mcpDetail" role="dialog" aria-label="항목 상세"></aside>
     <div class="mcp-bar" id="mcpBar">
         <div class="mcp-inner">
           <div class="mcp-selcount"><span><b id="mcpSelN">0</b>개 선택됨</span><span class="mcp-warn" id="mcpEnvWarn" style="display:none">🔑 일부는 설치 전 키 입력이 필요합니다</span></div>
@@ -1772,8 +1767,9 @@ load();
   function saveCollapsed() { try { localStorage.setItem('csm-mcp-collapsed', JSON.stringify([...collapsed])); } catch {} }
   const collapsed = loadCollapsed();
 
-  const CATS_MCP = { dev: '🛠️ 개발', vcs: '🔀 버전관리', web: '🌐 브라우저·웹', data: '🗄️ 데이터', collab: '💬 협업', gamedev: '🎮 게임·언리얼' };
-  const CATS_HAR = { workflow: '🔀 워크플로우', design: '🎨 디자인', gamedev: '🎮 게임·언리얼', gamedesign: '📐 게임기획' };
+  // data 카테고리는 유일 항목이던 Google Drive가 빠지면서 제거 — 빈 항목이 사이드바에 남지 않도록
+  const CATS_MCP = { dev: '🛠️ 개발', vcs: '🔀 버전관리', web: '🌐 브라우저·웹', collab: '💬 협업', gamedev: '🎮 게임·언리얼' };
+  const CATS_HAR = { workflow: '🔀 워크플로우', collab: '💬 협업', design: '🎨 디자인', gamedev: '🎮 게임·언리얼', gamedesign: '📐 게임기획' };
   const TAGDEF = {
     pop: { cls: 'mcp-t-pop', txt: '⭐ 인기' }, env: { cls: 'mcp-t-env', txt: '🔑 env 필요' },
     free: { cls: 'mcp-t-free', txt: '✓ 즉시 설치' }, installed: { cls: 'mcp-t-done', txt: '● 설치됨' },
@@ -1799,7 +1795,8 @@ load();
     const t = [];
     if (m.popular) t.push('pop');
     if (m.manual) t.push('manual');
-    else if (view === 'mcp') { (m.env && m.env.length) ? t.push('env') : t.push('free'); }
+    // envOptional = 값이 자동 감지돼 입력 없이도 동작 → 'env 필요' 배지를 달지 않는다
+    else if (view === 'mcp') { (m.env && m.env.length && !m.envOptional) ? t.push('env') : t.push('free'); }
     else { (m.steps || []).some((s) => s.indexOf('/plugin') === 0) ? t.push('plugin') : t.push('git'); }
     if (isInstalled(m)) t.push('installed');
     return t;
@@ -1822,14 +1819,17 @@ load();
     const isMcp = view === 'mcp';
     const inst = isInstalled(m);
     const isManual = !!m.manual;
-    const tags = tagsFor(m).map((t) => `<span class="mcp-tag ${TAGDEF[t].cls}">${TAGDEF[t].txt}</span>`).join('');
+    // 카드에는 예외 상태만 배지로 남긴다 — '즉시 설치'가 대부분이라 붙이면 소음이 되고,
+    // 인기·플러그인·git 배지는 상세에서 확인하면 충분하다.
+    const CARD_TAGS = ['manual', 'env', 'installed'];
+    const tags = tagsFor(m).filter((t) => CARD_TAGS.includes(t))
+      .map((t) => `<span class="mcp-tag ${TAGDEF[t].cls}">${TAGDEF[t].txt}</span>`).join('');
     const disabled = inst ? 'disabled title="이미 설치됨"' : (isManual ? 'disabled title="수동 설치 항목"' : '');
-    return `<div class="mcp-card" data-id="${esc(m.id)}">
-      <div class="mcp-chead"><input class="mcp-chk" type="checkbox" ${disabled}>
+    return `<div class="mcp-card" data-id="${esc(m.id)}" tabindex="0" role="button" aria-label="${esc(m.name)} 상세 보기">
+      <div class="mcp-chead"><input class="mcp-chk" type="checkbox" ${disabled} aria-label="${esc(m.name)} 설치 선택">
         <div class="mcp-namewrap"><div class="mcp-cname"><span class="mcp-logo ${isMcp ? '' : 'mcp-pl'}">${esc((m.name || '?').slice(0, 2).toUpperCase())}</span>${esc(m.name)}</div></div></div>
       <p class="mcp-cdesc">${esc(m.description)}</p>
-      <div class="mcp-tags">${tags}</div>
-      <div class="mcp-cfoot"><button class="mcp-details"><span class="mcp-arw">▸</span> 자세히 보기</button>${inst ? '<span class="mcp-instnote">✓ 사용 중</span>' : ''}</div>
+      ${tags ? `<div class="mcp-tags">${tags}</div>` : ''}
     </div>`;
   }
   // 카드 안이 아니라 우측 패널에 그리는 상세 본문 (내용은 기존 .mcp-detailx와 동일)
@@ -1855,7 +1855,13 @@ load();
           <div class="mcp-envstatus" data-key="${esc(e.key)}"></div>
         </div>`).join('')}
         </div>` : '';
-      const kv = `<div class="mcp-kv"><span class="mcp-k">명령</span><span><code>${esc(m.command)} ${esc((m.args || []).join(' '))}</code></span><span class="mcp-k">env</span><span>${(m.env && m.env.length) ? m.env.map((e) => '<code>' + esc(e.key) + '</code>').join(', ') : '<span style="color:#1a7f4b">불필요 — 즉시 설치</span>'}</span></div>`;
+      const target = m.transport === 'http'
+        ? `<span class="mcp-k">주소</span><span><code>${esc(m.url)}</code></span>`
+        : `<span class="mcp-k">명령</span><span><code>${esc(m.command)} ${esc((m.args || []).join(' '))}</code></span>`;
+      const envNote = (m.env && m.env.length)
+        ? m.env.map((e) => '<code>' + esc(e.key) + '</code>').join(', ') + (m.envOptional ? ' <span style="color:#1a7f4b">(자동 감지 — 선택)</span>' : '')
+        : '<span style="color:#1a7f4b">불필요 — 즉시 설치</span>';
+      const kv = `<div class="mcp-kv">${target}<span class="mcp-k">env</span><span>${envNote}</span></div>`;
       body = `<div class="mcp-cmd">${mcpCmd(m)}</div>${kv}${envHtml}`;
     } else {
       const fblbl = `<div class="mcp-fblbl">${(m.steps || []).some((s) => s.indexOf('/plugin') === 0) ? '설치 순서 (플러그인 → 실패 시 폴백):' : '설치:'}</div>`;
@@ -1871,15 +1877,15 @@ load();
   }
   // 패널을 다시 그린 뒤 카드의 '보는 중' 표시를 맞춘다. openId가 현재 목록에 없으면(검색·필터로 사라짐) 그대로 둔다.
   function renderDetail() {
-    const pane = $('mcpDetail');
+    const pane = $('mcpDetail'), back = $('mcpDetailBack');
     overlay.querySelectorAll('.mcp-card.mcp-open').forEach((c) => c.classList.remove('mcp-open'));
     const m = openId ? curList().find((x) => x.id === openId) : null;
     if (!m) {
-      pane.classList.add('mcp-dnone');
-      pane.innerHTML = '<div class="mcp-dempty"><span class="mcp-dicon">🧩</span>카드를 클릭하면<br>설치 명령과 상세 정보가 여기에 표시됩니다.</div>';
+      pane.classList.add('mcp-dnone'); back.classList.add('mcp-dnone');
+      pane.innerHTML = '';
       return;
     }
-    pane.classList.remove('mcp-dnone');
+    pane.classList.remove('mcp-dnone'); back.classList.remove('mcp-dnone');
     pane.innerHTML = detailHtml(m);
     pane.scrollTop = 0;
     const card = cardEl(m.id);
@@ -1955,8 +1961,14 @@ load();
     if (input) input.value = val;
   }
   function wire() {
-    overlay.querySelectorAll('.mcp-details').forEach((b) => { b.onclick = () => toggleDetail(b.closest('.mcp-card').dataset.id); });
-    overlay.querySelectorAll('.mcp-cname').forEach((el) => { el.onclick = () => toggleDetail(el.closest('.mcp-card').dataset.id); });
+    // 카드 전체가 상세를 여는 버튼 — 체크박스만 예외(선택 토글)
+    overlay.querySelectorAll('.mcp-card').forEach((card) => {
+      card.onclick = (e) => { if (!e.target.closest('.mcp-chk')) toggleDetail(card.dataset.id); };
+      card.onkeydown = (e) => {
+        if (e.target !== card || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault(); toggleDetail(card.dataset.id);
+      };
+    });
     overlay.querySelectorAll('.mcp-chk').forEach((chk) => {
       const card = chk.closest('.mcp-card'), id = card.dataset.id, S = curSel();
       chk.checked = S.has(id);
@@ -2089,6 +2101,7 @@ load();
     if (ok) { curSel().clear(); await loadCatalog(); }
   };
 
+  $('mcpDetailBack').onclick = () => { openId = null; renderDetail(); }; // 바깥 클릭으로 상세 닫기
   function openMcp() { overlay.classList.add('open'); openId = null; loadCatalog(); }
   function closeMcp() { overlay.classList.remove('open'); }
   $('mcpBtn').onclick = openMcp;
