@@ -169,6 +169,14 @@ const BOOT_COMMIT = (() => {
   return r.status === 0 ? r.stdout.trim() : null;
 })();
 
+// 현재 브랜치가 추적하는 원격 브랜치(예: origin/master). 감지·적용이 같은 기준을 쓰게 하는 단일 출처.
+// (기존엔 감지만 origin/master로 고정돼, master 아닌 브랜치에선 pull(=@{upstream}) 대상과 어긋나 업데이트가 안 먹었음)
+const UPSTREAM = (() => {
+  const r = spawnSync('git', ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+    { cwd: __dirname, windowsHide: true, encoding: 'utf8' });
+  return r.status === 0 ? r.stdout.trim() : null;
+})();
+
 // 부팅 직후 백그라운드로 원격 확인만 해둔다 (받을지는 사용자가 결정)
 setTimeout(() => {
   try {
@@ -594,7 +602,7 @@ const server = http.createServer(async (req, res) => {
       };
       sendJson(res, 200, {
         commit: BOOT_COMMIT,
-        behind: count('HEAD..origin/master'),
+        behind: UPSTREAM ? count(`HEAD..${UPSTREAM}`) : 0,
         restart: BOOT_COMMIT ? count(`${BOOT_COMMIT}..HEAD`) : 0,
         clients: aliveClients, // 서버를 붙잡고 있는 열린 탭 수
       });
