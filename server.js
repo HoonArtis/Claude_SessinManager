@@ -9,12 +9,15 @@ const { spawn, spawnSync } = require('node:child_process');
 const { scanSessions } = require('./lib/scan-sessions');
 const { getKeybindings, setKeybinding, unsetKeybinding } = require('./lib/wt-keybindings');
 const { trashSessions } = require('./lib/trash-sessions');
+const { buildLaunchArgs, readDefaultFolder, withDefaultFolder } = require('./lib/new-session');
 const { parseSession, extractUserPrompts, extractConversation, extractConversationFull } = require('./lib/parse-session');
 const { buildHandoffMd } = require('./lib/handoff');
+const { loadCatalog, buildMcpAddArgs, buildHarnessPrompt, parseInstalledMcps, parseInstalledPlugins } = require('./lib/mcp-catalog');
+const { uefnLogPath, parseVerseProjectRoot } = require('./lib/uefn-detect');
 
 const SAFE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
 
-const PORT = 7777;
+const PORT = Number(process.env.CSM_PORT) || 7777;
 const DISCOVERY_PORT = 7778;
 const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 
@@ -182,30 +185,11 @@ function wtSettingsPath() {
   return WT_SETTINGS_CANDIDATES.find((p) => fs.existsSync(p)) || null;
 }
 
-// 열기 방식: window(새 창) / tab(기존 창 새 탭) / split-right(오른쪽 분할) / split-down(아래 분할)
-const OPEN_MODES = {
-  window: ['-w', 'new', 'nt'],
-  tab: ['-w', '0', 'nt'],
-  'split-right': ['-w', '0', 'sp', '-V'],
-  'split-down': ['-w', '0', 'sp', '-H'],
-};
-
-function normalizeMode(mode) {
-  return OPEN_MODES[mode] ? mode : 'tab';
-}
-
-function launchInTerminal(cwd, claudeCmd, mode) {
-  let child;
-  if (hasWt) {
-    const openArgs = OPEN_MODES[normalizeMode(mode)];
-    child = spawn('wt', [...openArgs, '-d', cwd, 'cmd', '/k', claudeCmd], { detached: true, stdio: 'ignore', env: CLEAN_ENV });
-  } else {
-    child = spawn('cmd', ['/c', 'start', '"claude"', 'cmd', '/k', `cd /d "${cwd}" && ${claudeCmd}`], {
-      detached: true,
-      stdio: 'ignore',
-      shell: false,
-    });
-  }
+// 열기 방식(window/tab/split-right/split-down)과 런치 인자는 lib/new-session이 단일 출처.
+// command가 falsy면 그 폴더에서 셸만 연다(claude 없이).
+function launchInTerminal(cwd, command, mode) {
+  const { cmd, args } = buildLaunchArgs({ cwd, command, mode, hasWt });
+  const child = spawn(cmd, args, { detached: true, stdio: 'ignore', env: CLEAN_ENV });
   child.unref();
 }
 
@@ -223,12 +207,108 @@ function openFolder(cwd) {
   child.unref();
 }
 
+// 설치된 MCP/플러그인 이름을 CLI로 조회(실패해도 빈 배열).
+function detectInstalled() {
+  const result = { mcp: [], harness: [] };
+  try {
+    const r = spawnSync('claude', ['mcp', 'list'], { encoding: 'utf8', timeout: 20000, env: CLEAN_ENV });
+    if (r.stdout) result.mcp = [...parseInstalledMcps(r.stdout)];
+  } catch {}
+  try {
+    const r = spawnSync('claude', ['plugin', 'list'], { encoding: 'utf8', timeout: 20000, env: CLEAN_ENV });
+    if (r.stdout) result.harness = [...parseInstalledPlugins(r.stdout)];
+  } catch {}
+  return result;
+}
+
 function validCwd(res, cwd) {
   if (!cwd || !fs.existsSync(cwd)) {
     sendJson(res, 400, { error: `작업 폴더가 존재하지 않습니다: ${cwd || '(없음)'}` });
     return false;
   }
   return true;
+}
+
+// config.json을 디스크에서 새로 읽는다(인메모리 CONFIG는 시작 시점 값이라 최신이 아닐 수 있음).
+function loadConfigFresh() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+// 기본 폴더를 config.json에 머지 저장(원격 키 보존, 쓰기 전 백업).
+function saveDefaultFolder(folder) {
+  const p = path.join(__dirname, 'config.json');
+  const cfg = loadConfigFresh();
+  if (fs.existsSync(p)) fs.copyFileSync(p, p + '.csm-backup');
+  fs.writeFileSync(p, JSON.stringify(withDefaultFolder(cfg, folder), null, 2));
+}
+
+// 네이티브 폴더 선택창(PowerShell)을 띄우고 고른 경로를 resolve. 취소 시 null.
+// 서버(백그라운드)에서 띄운 다이얼로그는 브라우저 뒤로 숨을 수 있어, TopMost
+// 소유자 폼을 만들어 다이얼로그를 최상단으로 끌어온다.
+// 현재 열려 있는 폴더 선택창 하나(재클릭 시 이전 것을 닫고 새로 연다).
+let activePick = null;
+
+function pickFolderDialog(seed) {
+  return new Promise((resolve) => {
+    // 이미 열린 선택창이 있으면 그 프로세스를 종료(창 닫힘)하고 새로 연다.
+    if (activePick) { try { activePick.cancel(); } catch {} }
+
+    // 상주 http 서버(백그라운드)가 직접 spawn한 powershell은 숨김 상태 상속/포그라운드
+    // 권한 문제로 다이얼로그가 화면에 안 뜬다. → 앱이 쓰는 방식(launch.vbs)처럼 wscript로
+    // powershell을 최상위 독립 프로세스로 띄우고, 결과는 임시 파일로 주고받는다.
+    // 모던 탐색기형 창(IFileOpenDialog)은 lib/pick-folder.ps1이 담당한다.
+    const id = crypto.randomBytes(6).toString('hex');
+    const dir = os.tmpdir();
+    const outPath = path.join(dir, `csm-pick-${id}.txt`);
+    const pidPath = path.join(dir, `csm-pick-${id}.pid`);
+    const vbsPath = path.join(dir, `csm-pick-${id}.vbs`);
+    const ps1 = path.join(__dirname, 'lib', 'pick-folder.ps1');
+    const q = (s) => String(s || '').replace(/"/g, '');
+    const vbs = 'Set sh = CreateObject("WScript.Shell")\r\n'
+      + `sh.Run "powershell -STA -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""${ps1}"" -Seed ""${q(seed)}"" -Out ""${outPath}"" -PidFile ""${pidPath}""", 0, False\r\n`;
+    const cleanup = () => { for (const f of [outPath, pidPath, vbsPath]) { try { fs.unlinkSync(f); } catch {} } };
+
+    const ctrl = { pid: null, timer: null, settled: false };
+    const finish = (val) => {
+      if (ctrl.settled) return;
+      ctrl.settled = true;
+      clearInterval(ctrl.timer);
+      cleanup();
+      if (activePick === ctrl) activePick = null;
+      resolve(val);
+    };
+    ctrl.cancel = () => {
+      if (ctrl.settled) return;
+      if (ctrl.pid) { try { spawnSync('taskkill', ['/F', '/PID', String(ctrl.pid)], { windowsHide: true }); } catch {} }
+      finish(null);
+    };
+    activePick = ctrl;
+
+    try { fs.writeFileSync(vbsPath, vbs, 'utf8'); }
+    catch { finish(null); return; }
+    const child = spawn('wscript', [vbsPath], { detached: true, stdio: 'ignore', windowsHide: false });
+    child.on('error', () => finish(null));
+    child.unref();
+
+    // PID 파악 + 결과 파일 폴링(최대 3분). 결과 내용이 비면 취소로 간주.
+    const startMs = Date.now();
+    ctrl.timer = setInterval(() => {
+      if (!ctrl.pid && fs.existsSync(pidPath)) {
+        try { ctrl.pid = parseInt(fs.readFileSync(pidPath, 'utf8').trim(), 10) || null; } catch {}
+      }
+      if (fs.existsSync(outPath)) {
+        let val = null;
+        try { val = fs.readFileSync(outPath, 'utf8').trim() || null; } catch {}
+        finish(val);
+      } else if (Date.now() - startMs > 180000) {
+        finish(null);
+      }
+    }, 250);
+  });
 }
 
 // --- 브라우저 탭이 모두 닫히면 서버 자동 종료 ---
@@ -819,6 +899,42 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, trashSessions(PROJECTS_DIR, items));
       return;
     }
+    if (req.url === '/api/new-session-default') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      if (req.method === 'GET') {
+        sendJson(res, 200, { folder: readDefaultFolder(loadConfigFresh()) });
+        return;
+      }
+      if (req.method === 'POST') {
+        let body;
+        try { body = JSON.parse(await readBody(req)); } catch { sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' }); return; }
+        const folder = body && body.folder;
+        if (!validCwd(res, folder)) return;
+        saveDefaultFolder(folder);
+        sendJson(res, 200, { ok: true, folder });
+        return;
+      }
+    }
+    if (req.method === 'POST' && req.url === '/api/pick-folder') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      let body = {};
+      try { body = JSON.parse(await readBody(req)); } catch {}
+      const seed = (body && body.seed) || readDefaultFolder(loadConfigFresh());
+      const picked = await pickFolderDialog(seed);
+      if (!picked) { sendJson(res, 200, { cancelled: true }); return; }
+      sendJson(res, 200, { path: picked });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/new-session') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      let body;
+      try { body = JSON.parse(await readBody(req)); } catch { sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' }); return; }
+      const { cwd, claude, mode } = body || {};
+      if (!validCwd(res, cwd)) return;
+      launchInTerminal(cwd, claude ? 'claude' : null, mode);
+      sendJson(res, 200, { ok: true });
+      return;
+    }
     if (req.method === 'POST' && (req.url === '/api/resume' || req.url === '/api/open-folder')) {
       let body;
       try {
@@ -843,6 +959,73 @@ const server = http.createServer(async (req, res) => {
       const chained = loadChains()[sessionId];
       launchResume(cwd, chained || sessionId, body.mode);
       sendJson(res, 200, { ok: true });
+      return;
+    }
+    if (req.method === 'GET' && req.url === '/api/catalog') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      // 목록만 즉시 반환. 설치 감지(claude mcp list 헬스체크가 느림)는 /api/installed로 분리.
+      sendJson(res, 200, loadCatalog(__dirname));
+      return;
+    }
+    if (req.method === 'GET' && req.url === '/api/installed') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      sendJson(res, 200, detectInstalled());
+      return;
+    }
+    if (req.method === 'GET' && req.url.startsWith('/api/detect-env')) {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      const target = new URL(req.url, 'http://localhost').searchParams.get('target');
+      const out = {};
+      if (target === 'verse-diagnostics') {
+        const logPath = uefnLogPath({ localAppData: process.env.LOCALAPPDATA, homedir: os.homedir() });
+        const logFound = !!(logPath && fs.existsSync(logPath));
+        out.UEFN_LOG_PATH = { value: logFound ? logPath : '', found: logFound };
+        let root = '';
+        if (logFound) {
+          try { root = parseVerseProjectRoot(fs.readFileSync(logPath, 'utf8')) || ''; } catch {}
+        }
+        out.VERSE_PROJECT_ROOT = { value: root, found: !!root };
+      }
+      sendJson(res, 200, out);
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/mcp-install') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      let body;
+      try { body = JSON.parse(await readBody(req)); } catch { sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' }); return; }
+      const { items, scope, projectDir } = body || {};
+      if (!Array.isArray(items) || !items.length) { sendJson(res, 400, { error: '설치할 항목이 없습니다.' }); return; }
+      const useScope = scope === 'project' ? 'project' : 'user';
+      const cwd = useScope === 'project' ? projectDir : undefined;
+      if (useScope === 'project' && !validCwd(res, cwd)) return;
+      const cat = loadCatalog(__dirname);
+      const byId = new Map(cat.mcp.map((m) => [m.id, m]));
+      const results = [];
+      for (const it of items) {
+        const entry = byId.get(it && it.id);
+        if (!entry) { results.push({ id: it && it.id, ok: false, message: '카탈로그에 없는 항목' }); continue; }
+        const argv = buildMcpAddArgs(entry, { scope: useScope, envValues: it.envValues || {}, headerValues: it.headerValues || {} });
+        const r = spawnSync('claude', argv, { encoding: 'utf8', timeout: 120000, cwd, env: CLEAN_ENV });
+        const ok = r.status === 0;
+        const msg = ok ? '설치됨' : String((r.stderr || r.stdout || (r.error && r.error.message) || '실패')).trim().slice(0, 400);
+        results.push({ id: entry.id, ok, message: msg });
+      }
+      sendJson(res, 200, { results });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/harness-install') {
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      let body;
+      try { body = JSON.parse(await readBody(req)); } catch { sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' }); return; }
+      const { ids, mode } = body || {};
+      if (!Array.isArray(ids) || !ids.length) { sendJson(res, 400, { error: '설치할 하네스가 없습니다.' }); return; }
+      const cat = loadCatalog(__dirname);
+      const byId = new Map(cat.harness.map((h) => [h.id, h]));
+      const entries = ids.map((id) => byId.get(id)).filter(Boolean);
+      if (!entries.length) { sendJson(res, 400, { error: '카탈로그에 없는 하네스입니다.' }); return; }
+      const prompt = buildHarnessPrompt(entries).replace(/"/g, '\\"');
+      launchInTerminal(os.homedir(), `claude "${prompt}"`, mode);
+      sendJson(res, 200, { ok: true, launched: entries.map((e) => e.id) });
       return;
     }
     sendJson(res, 404, { error: 'not found' });
