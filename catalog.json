@@ -3,7 +3,13 @@
     {
       "id": "filesystem", "name": "Filesystem", "category": "dev", "popular": false,
       "description": "허용한 폴더 안에서만 파일 읽기·쓰기",
-      "long": "설치할 때 지정한 디렉터리 안에서만 파일을 목록·읽기·쓰기·이동·삭제할 수 있게 해줍니다. 지정한 경로 밖으로는 접근이 막혀 있어, 특정 작업 폴더만 Claude에 열어주고 싶을 때 안전합니다. 여러 경로를 함께 열 수도 있습니다. Claude Code 자체도 파일을 다루지만, 이 MCP는 '이 폴더만'으로 범위를 명확히 못박는 용도로 유용합니다.",
+      "long": "설치할 때 지정한 디렉터리 안으로 파일 접근 범위를 제한합니다.",
+      "points": [
+        "목록·읽기·쓰기·이동·삭제 지원",
+        "지정 경로 밖 접근 차단 — 작업 폴더만 선택적으로 공개",
+        "여러 경로 동시 지정 가능",
+        "Claude Code 기본 파일 도구와의 차이 — '이 폴더만'으로 범위를 명시"
+      ],
       "docs": "github.com/modelcontextprotocol/servers",
       "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\work"],
       "url": null, "headers": [], "env": []
@@ -11,7 +17,13 @@
     {
       "id": "git", "name": "Git", "category": "vcs", "popular": false,
       "description": "로컬 저장소의 커밋·diff·로그 조작",
-      "long": "로컬 git 저장소를 Claude가 다루게 해줍니다. status·diff·log 조회부터 스테이징·커밋·브랜치 작업까지, GitHub 없이 내 컴퓨터의 저장소만으로 동작합니다. \"방금 바뀐 것 diff 보여줘\", \"이 변경 커밋해줘\" 같은 흐름에 적합합니다. Python 도구 실행기 uvx가 설치돼 있어야 합니다(uv 패키지).",
+      "long": "로컬 git 저장소를 원격 없이 내 컴퓨터에서만 다룹니다.",
+      "points": [
+        "status·diff·log 조회",
+        "스테이징·커밋·브랜치 작업",
+        "GitHub 등 원격 저장소 불필요",
+        "uvx 필요 (uv 패키지)"
+      ],
       "docs": "github.com/modelcontextprotocol/servers",
       "transport": "stdio", "command": "uvx", "args": ["mcp-server-git"],
       "url": null, "headers": [], "env": []
@@ -19,7 +31,13 @@
     {
       "id": "sentry", "name": "Sentry", "category": "dev", "popular": false,
       "description": "에러 이슈·스택트레이스를 가져와 디버깅",
-      "long": "Sentry에 쌓인 에러를 Claude가 읽어와 디버깅을 돕습니다. 프로젝트의 최근 이슈 목록, 개별 이벤트 상세, 스택트레이스와 발생 빈도를 조회해 \"오늘 가장 많이 난 에러 원인 분석해줘\" 같은 요청에 답합니다. 조직·프로젝트 접근용 Auth Token이 필요하며, 코드를 함께 보면 원인 추적이 정확해집니다.",
+      "long": "Sentry에 쌓인 에러를 조회해 디버깅 근거로 삼습니다.",
+      "points": [
+        "프로젝트 최근 이슈 목록·개별 이벤트 상세 조회",
+        "스택트레이스·발생 빈도 확인",
+        "조직·프로젝트 접근용 Auth Token 필요",
+        "코드와 함께 열람 시 원인 추적 정확도 상승"
+      ],
       "docs": "docs.sentry.io",
       "transport": "stdio", "command": "npx", "args": ["-y", "@sentry/mcp-server"],
       "url": null, "headers": [],
@@ -28,7 +46,13 @@
     {
       "id": "playwright", "name": "Playwright", "category": "web", "popular": true,
       "description": "실제 브라우저를 자동 조작·스크린샷",
-      "long": "진짜 크로미움 브라우저를 띄워 Claude가 웹을 사람처럼 조작하게 해줍니다. 페이지 이동·클릭·입력·스크롤은 물론, 스크린샷 촬영과 접근성 트리(구조) 추출까지 지원해 \"이 사이트 로그인해서 화면 캡처해줘\", \"이 폼 채우고 제출해줘\", 웹 E2E 테스트/스크래핑에 강력합니다. env 없이 바로 설치되고, 첫 실행 때 브라우저 바이너리를 자동으로 받습니다.",
+      "long": "실제 크로미움 브라우저를 띄워 웹 페이지를 조작합니다.",
+      "points": [
+        "페이지 이동·클릭·입력·스크롤",
+        "스크린샷 촬영·접근성 트리 추출",
+        "웹 E2E 테스트·스크래핑에 적합",
+        "env 불필요 — 첫 실행 시 브라우저 바이너리 자동 다운로드"
+      ],
       "docs": "github.com/microsoft/playwright-mcp",
       "transport": "stdio", "command": "npx", "args": ["@playwright/mcp@latest"],
       "url": null, "headers": [], "env": []
@@ -36,7 +60,13 @@
     {
       "id": "fetch", "name": "Fetch", "category": "web", "popular": false,
       "description": "URL을 받아 본문만 마크다운으로",
-      "long": "지정한 URL의 웹 페이지를 받아 광고·메뉴를 걷어내고 본문만 마크다운으로 돌려줍니다. 브라우저를 띄우는 Playwright보다 훨씬 가볍고 빨라, 문서·기사·API 페이지를 '그냥 읽어오기'만 할 때 적합합니다. 자바스크립트로 그려지는 동적 페이지는 못 읽을 수 있어, 그럴 땐 Playwright가 낫습니다. uvx 필요.",
+      "long": "지정한 URL에서 광고·메뉴를 걷어내고 본문만 마크다운으로 추출합니다.",
+      "points": [
+        "문서·기사·API 페이지 단순 열람에 적합",
+        "Playwright보다 가볍고 빠름 — 브라우저 미기동",
+        "자바스크립트 동적 페이지는 한계 — 해당 경우 Playwright 권장",
+        "uvx 필요"
+      ],
       "docs": "github.com/modelcontextprotocol/servers",
       "transport": "stdio", "command": "uvx", "args": ["mcp-server-fetch"],
       "url": null, "headers": [], "env": []
@@ -44,7 +74,14 @@
     {
       "id": "gdrive", "name": "Google Drive", "category": "data", "popular": false,
       "description": "드라이브 문서 검색·본문 읽기",
-      "long": "Google Drive의 파일을 이름·내용으로 검색하고, 구글 문서/시트의 텍스트를 추출해 Claude가 읽게 해줍니다. \"작년 기획서 찾아서 요약해줘\"처럼 흩어진 문서를 근거로 삼을 때 유용합니다. Google Cloud에서 OAuth 자격증명(credentials.json)을 만들어 경로를 지정해야 하며, 첫 연결 때 브라우저 로그인 승인이 필요합니다.",
+      "long": "Google Drive의 파일을 검색하고 문서 본문을 추출합니다.",
+      "points": [
+        "이름·내용 기반 파일 검색",
+        "구글 문서·시트 텍스트 추출",
+        "흩어진 문서를 근거 자료로 활용",
+        "Google Cloud OAuth 자격증명(credentials.json) 경로 지정 필요",
+        "첫 연결 시 브라우저 로그인 승인 필요"
+      ],
       "docs": "github.com/modelcontextprotocol/servers",
       "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-gdrive"],
       "url": null, "headers": [],
@@ -53,7 +90,13 @@
     {
       "id": "slack", "name": "Slack", "category": "collab", "popular": true,
       "description": "채널·메시지 읽기·전송·답글",
-      "long": "Slack 워크스페이스를 Claude가 다루게 해줍니다. 채널 목록·대화 히스토리 조회, 메시지 전송, 스레드 답글, 리액션까지 가능해 \"공지 채널에 릴리스 노트 올려줘\", \"어제 #버그 채널 요약해줘\" 같은 요청을 처리합니다. Slack 앱을 만들어 봇 토큰(xoxb-)과 워크스페이스 Team ID를 넣어야 하고, 봇이 참여한 채널에서만 동작합니다.",
+      "long": "Slack 워크스페이스의 대화를 읽고 메시지를 보냅니다.",
+      "points": [
+        "채널 목록·대화 히스토리 조회",
+        "메시지 전송·스레드 답글·리액션",
+        "봇 토큰(xoxb-)과 워크스페이스 Team ID 필요",
+        "동작 범위 — 봇이 참여한 채널로 한정"
+      ],
       "docs": "github.com/modelcontextprotocol/servers",
       "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-slack"],
       "url": null, "headers": [],
@@ -65,7 +108,14 @@
     {
       "id": "notion", "name": "Notion", "category": "collab", "popular": false,
       "description": "페이지·데이터베이스 조회·편집",
-      "long": "Notion 페이지와 데이터베이스를 Claude가 읽고 쓰게 해줍니다. 페이지·DB 검색, 블록 내용 읽기, 새 페이지 작성, 속성(태그·상태 등) 갱신을 지원해 회의록 정리나 작업 DB 업데이트를 맡길 수 있습니다. Notion Integration 토큰을 발급하고, 대상 페이지를 그 Integration에 '연결'해줘야 접근됩니다(연결 안 하면 안 보임).",
+      "long": "Notion 페이지와 데이터베이스를 읽고 씁니다.",
+      "points": [
+        "페이지·DB 검색, 블록 내용 읽기",
+        "새 페이지 작성, 속성(태그·상태) 갱신",
+        "회의록 정리·작업 DB 갱신에 활용",
+        "Integration 토큰 발급 필요",
+        "대상 페이지를 Integration에 연결해야 접근 — 미연결 시 조회 불가"
+      ],
       "docs": "developers.notion.com",
       "transport": "stdio", "command": "npx", "args": ["-y", "@notionhq/notion-mcp-server"],
       "url": null, "headers": [],
@@ -74,7 +124,15 @@
     {
       "id": "perforce", "name": "Perforce (P4)", "category": "vcs", "popular": true,
       "description": "P4 파일·체인지리스트·셸브·워크스페이스·스트림 조작",
-      "long": "Perforce(P4, Helix Core) 버전관리에 Claude가 연결해 파일 조회·제출, 체인지리스트·셸브·워크스페이스·잡·리뷰·스트림을 다루게 해줍니다. 언리얼 등 대형 게임 프로젝트가 표준으로 쓰는 VCS라 UE 작업과 궁합이 좋습니다. uvx로 바로 설치되고 기본은 --readonly로 안전하게 시작합니다. 접속 정보(P4PORT/P4USER 등)를 env로 지정하며, 인증은 보통 'p4 login' 티켓을 쓰고 필요 시 P4PASSWD로 대체합니다.",
+      "long": "Perforce(P4, Helix Core)에 연결해 버전관리 작업을 수행합니다.",
+      "points": [
+        "파일 조회·제출, 체인지리스트·셸브 관리",
+        "워크스페이스·잡·리뷰·스트림 조작",
+        "언리얼 등 대형 게임 프로젝트의 표준 VCS — UE 작업과 궁합",
+        "기본 --readonly 모드로 안전하게 시작",
+        "접속 정보(P4PORT·P4USER 등) env 지정",
+        "인증은 'p4 login' 티켓, 필요 시 P4PASSWD로 대체"
+      ],
       "docs": "github.com/perforce/p4mcp-server",
       "transport": "stdio", "command": "uvx", "args": ["p4mcp-server", "--readonly", "--allow-usage"],
       "url": null, "headers": [],
@@ -87,8 +145,15 @@
     },
     {
       "id": "verse-diagnostics", "name": "Verse Diagnostics", "category": "gamedev", "popular": false,
-      "description": "UEFN Verse 빌드 에러를 구조화해 Claude에 전달",
-      "long": "UEFN의 UnrealEditorFortnite.log를 파싱해 Verse 컴파일·빌드 진단(에러·경고)을 구조화된 데이터로 Claude에 넘겨줍니다. \"방금 Verse 빌드 왜 실패했는지 봐줘\" 같은 요청에서 로그를 직접 읽어 원인과 위치를 짚어줍니다. uvx로 바로 설치되며(파이썬 uv 필요), 로그 파일 경로와 프로젝트 루트를 env로 지정해야 동작합니다. UEFN은 Verse 컴파일 결과가 로그로만 남기 때문에, 이 MCP가 있으면 빌드 오류 디버깅이 훨씬 매끄럽습니다.",
+      "description": "UEFN Verse 빌드 진단을 구조화해 전달",
+      "long": "UEFN의 UnrealEditorFortnite.log를 파싱해 Verse 컴파일·빌드 진단을 구조화합니다.",
+      "points": [
+        "에러·경고를 구조화된 데이터로 전달",
+        "빌드 실패 원인과 위치 특정",
+        "UEFN 특성 — Verse 컴파일 결과가 로그로만 남아 디버깅 난이도 상승",
+        "로그 파일 경로·프로젝트 루트 env 지정 필요",
+        "uvx 필요 (파이썬 uv)"
+      ],
       "docs": "github.com/berry-13/verse-diagnostics-mcp",
       "transport": "stdio", "command": "uvx", "args": ["verse-diagnostics-mcp"],
       "url": null, "headers": [],
@@ -100,8 +165,15 @@
     {
       "id": "uefn-mcp-official", "name": "UEFN MCP (공식·내장)", "category": "gamedev", "popular": true,
       "manual": true,
-      "description": "UEFN 에디터 내장 MCP — Verse·디바이스·씬그래프를 Claude로",
-      "long": "Epic이 2026-08-20 UEFN에 내장한 공식 MCP입니다. Claude Code를 UEFN 에디터에 직접 연결해 Verse 작성·컴파일, 디바이스 배치·설정, Scene Graph 편집, UMG UI 제작, 플레이 세션 실행까지 에디터를 떠나지 않고 수행합니다. 언리얼로 게임(포트나이트 크리에이티브)을 기획·구현할 때 사실상 표준 진입점입니다. 별도 설치가 아니라 에디터에서 '켜는' 방식이라 이 앱의 딸깍 설치 대상이 아닙니다.",
+      "description": "UEFN 에디터 내장 MCP — Verse·디바이스·씬그래프 제어",
+      "long": "Epic이 2026-08-20 UEFN에 내장한 공식 MCP입니다.",
+      "points": [
+        "Verse 작성·컴파일",
+        "디바이스 배치·설정, Scene Graph 편집",
+        "UMG UI 제작, 플레이 세션 실행",
+        "에디터를 벗어나지 않는 작업 흐름 — 포트나이트 크리에이티브 기획·구현의 표준 진입점",
+        "설치가 아닌 에디터 내 활성화 방식 — 딸깍 설치 대상 아님"
+      ],
       "docs": "dev.epicgames.com/documentation/fortnite/uefn-mcp",
       "manualNote": "1) UEFN → Project Settings → Beta Access 에서 'UEFN MCP Toolset' 켜기\n2) 에디터 콘솔에서 MCP 서버 시작\n3) Claude Code를 그 MCP 서버에 연결\n자세한 절차는 docs 참고",
       "transport": "stdio", "command": null, "args": [], "url": null, "headers": [], "env": []
@@ -110,7 +182,13 @@
       "id": "uefn-mcp-server", "name": "uefn-mcp-server (KirChuvakov)", "category": "gamedev", "popular": false,
       "manual": true,
       "description": "UEFN을 Claude로 제어 — 액터·에셋·레벨·파이썬 실행",
-      "long": "UEFN을 Claude Code에서 조작하는 커뮤니티 MCP 서버입니다. 액터·에셋·레벨·뷰포트 조작과 UEFN 내장 파이썬 실행 등 20여 개 도구를 제공하며 C++ 컴파일이 필요 없습니다. PyPI 배포가 없어 git clone 후 로컬 파이썬 경로로 등록해야 하므로 딸깍 설치가 아닙니다.",
+      "long": "UEFN을 외부에서 조작하는 커뮤니티 MCP 서버입니다.",
+      "points": [
+        "액터·에셋·레벨·뷰포트 조작",
+        "UEFN 내장 파이썬 실행 등 20여 개 도구",
+        "C++ 컴파일 불필요",
+        "PyPI 미배포 — git clone 후 로컬 파이썬 경로 등록 필요, 딸깍 설치 불가"
+      ],
       "docs": "github.com/KirChuvakov/uefn-mcp-server",
       "manualNote": "1) git clone https://github.com/KirChuvakov/uefn-mcp-server\n2) 파이썬 3.10+ 준비\n3) claude mcp add uefn -s user -- python C:/경로/uefn-mcp-server/mcp_server.py\n4) UEFN 내장 파이썬에서 리스너 실행 (README 참고)",
       "transport": "stdio", "command": null, "args": [], "url": null, "headers": [], "env": []
@@ -120,7 +198,14 @@
     {
       "id": "impeccable", "name": "impeccable", "category": "design", "popular": true,
       "description": "AI가 만든 UI의 어색함을 감지·교정",
-      "long": "\"에이전트를 위한 디자인 어휘\"를 표방하는 하네스로, AI가 생성한 UI 특유의 어색함(어중간한 간격, 애매한 대비, 흔한 그라디언트 등)을 감지하고 정밀한 명령으로 다듬게 해줍니다. 플러그인을 설치한 뒤 /impeccable init로 초기화하면 되고, CI에서 코드를 검사하는 CLI(npx impeccable detect)와 크롬 확장도 함께 제공합니다. 프론트엔드·디자인 작업의 마감 품질을 끌어올릴 때 유용합니다.",
+      "long": "'에이전트를 위한 디자인 어휘'를 표방하는 하네스입니다.",
+      "points": [
+        "AI 생성 UI 특유의 어색함 감지 — 어중간한 간격, 애매한 대비, 흔한 그라디언트",
+        "정밀한 명령으로 교정",
+        "설치 후 /impeccable init로 초기화",
+        "CI 검사용 CLI(npx impeccable detect)·크롬 확장 동봉",
+        "프론트엔드 마감 품질 향상에 활용"
+      ],
       "docs": "impeccable.style",
       "steps": ["/plugin marketplace add pbakaus/impeccable", "/plugin install impeccable@impeccable"],
       "fallback": ["npx impeccable install", "/impeccable init  (프로젝트별 초기화)"]
@@ -128,7 +213,14 @@
     {
       "id": "superpowers", "name": "superpowers", "category": "workflow", "popular": true,
       "description": "브레인스토밍·계획·TDD·디버깅 스킬 묶음",
-      "long": "개발 워크플로우 전반을 잡아주는 스킬 묶음입니다. 아이디어를 설계로 다듬는 브레인스토밍, 구현계획 작성, 테스트 주도 개발(TDD), 체계적 디버깅, 코드리뷰 요청/수용 같은 '일하는 방식'을 Claude에게 심어줘, 큰 기능을 만들 때 절차대로 안정적으로 진행하게 합니다. 마켓플레이스를 추가한 뒤 플러그인으로 설치하며, 여러 스킬이 함께 딸려옵니다.",
+      "long": "개발 워크플로우 전반의 '일하는 방식'을 정착시키는 스킬 묶음입니다.",
+      "points": [
+        "아이디어를 설계로 다듬는 브레인스토밍",
+        "구현계획 작성, 테스트 주도 개발(TDD)",
+        "체계적 디버깅, 코드리뷰 요청·수용",
+        "대형 기능의 절차적·안정적 진행",
+        "마켓플레이스 추가 후 플러그인 설치 — 다수 스킬 동반 설치"
+      ],
       "docs": "github.com/obra/superpowers",
       "steps": ["/plugin marketplace add obra/superpowers-marketplace", "/plugin install superpowers@superpowers-marketplace"],
       "fallback": []
@@ -136,7 +228,12 @@
     {
       "id": "elements-of-style", "name": "elements-of-style", "category": "workflow", "popular": false,
       "description": "글을 간결·명료하게 다듬는 글쓰기 스킬",
-      "long": "Strunk의 고전 글쓰기 규칙을 적용해, 사람이 읽는 모든 산문 — 문서·커밋 메시지·에러 메시지·설명·UI 문구 — 을 더 명료하고 강하고 간결하게 다듬어주는 스킬입니다. 장황한 설명이나 애매한 안내 문구를 깔끔하게 고칠 때 씁니다. superpowers 마켓플레이스에서 개별 설치할 수 있습니다.",
+      "long": "Strunk의 고전 글쓰기 규칙을 산문 전반에 적용합니다.",
+      "points": [
+        "적용 대상 — 문서·커밋 메시지·에러 메시지·설명·UI 문구",
+        "장황한 설명·애매한 안내 문구 교정",
+        "superpowers 마켓플레이스에서 개별 설치"
+      ],
       "docs": "github.com/obra/superpowers",
       "steps": ["/plugin marketplace add obra/superpowers-marketplace", "/plugin install elements-of-style@superpowers-marketplace"],
       "fallback": []
@@ -144,7 +241,14 @@
     {
       "id": "unreal-engine-skills-for-claude-code", "name": "UE Skills (Epic 공식)", "category": "gamedev", "popular": true,
       "description": "언리얼 에디터를 Claude로 직접 제어 — Epic 공식",
-      "long": "Epic Games가 직접 만든 공식 플러그인으로, Anthropic 공식 마켓플레이스(claude-plugins-official)에 올라와 있습니다. 언리얼 에디터를 Claude Code에서 MCP로 조작하게 해주며, 액터·블루프린트·나이아가라 등 30개 이상의 툴셋에 걸친 수백 개 도구를 제공합니다. 대량 변경 전후 자동 저장, 게임스레드 데드락 방지용 직렬 실행, 컴파일 대기 가드 같은 안전장치가 내장돼 있습니다. 에디터에서 ModelContextProtocol/AllToolsets 플러그인을 켜고 MCP 서버를 시작해야 동작합니다.",
+      "long": "Epic Games가 만든 공식 플러그인으로, Anthropic 공식 마켓플레이스(claude-plugins-official)에 등재돼 있습니다.",
+      "points": [
+        "액터·블루프린트·나이아가라 등 30개 이상 툴셋, 수백 개 도구",
+        "대량 변경 전후 자동 저장",
+        "게임스레드 데드락 방지용 직렬 실행",
+        "컴파일 대기 가드 내장",
+        "에디터에서 ModelContextProtocol/AllToolsets 플러그인 활성화 후 MCP 서버 기동 필요"
+      ],
       "docs": "github.com/EpicGames/unreal-engine-skills-for-claude-code-plugin",
       "steps": ["/plugin marketplace add anthropics/claude-plugins-official", "/plugin install unreal-engine-skills-for-claude-code@claude-plugins-official"],
       "fallback": []
@@ -152,7 +256,13 @@
     {
       "id": "unreal", "name": "AI Game Dev (Unreal)", "category": "gamedev", "popular": false,
       "description": "프로젝트 생성·엔진 플러그인 설치·에디터 실행까지 자동",
-      "long": "언리얼·유니티·고닷을 아우르는 AI 게임개발 플러그인입니다. Claude가 프로젝트를 만들고, 엔진 플러그인을 설치하고, 로그인한 뒤 에디터를 자동으로 여는 것까지 처리해 초기 셋업을 크게 줄여줍니다. 여기서는 Unreal용을 설치하며, 같은 마켓플레이스에서 unity@·godot@ 플러그인도 받을 수 있습니다.",
+      "long": "언리얼·유니티·고닷을 아우르는 AI 게임개발 플러그인입니다.",
+      "points": [
+        "프로젝트 생성, 엔진 플러그인 설치",
+        "로그인 후 에디터 자동 실행",
+        "초기 셋업 시간 단축",
+        "여기서는 Unreal용 설치 — 동일 마켓플레이스에 unity@·godot@ 제공"
+      ],
       "docs": "github.com/IvanMurzak/ai-game-dev-plugin",
       "steps": ["/plugin marketplace add IvanMurzak/ai-game-dev-plugin", "/plugin install unreal@ai-game-dev-plugin"],
       "fallback": ["/plugin install unity@ai-game-dev-plugin", "/plugin install godot@ai-game-dev-plugin"]
@@ -160,8 +270,16 @@
     {
       "id": "narsha-adk", "name": "NarshaADK", "category": "gamedev", "popular": false,
       "manual": true,
-      "description": "언리얼 C++·블루프린트를 AI가 이해하게 하는 ADK (Fab 배포)",
-      "long": "Next Stage Inc.의 NarshaADK — AI가 언리얼 C++ 소스·컴파일 심볼·바이너리 에셋과 블루프린트까지 읽어 이해하게 해주는 Agent Developer Kit입니다. 블루프린트 분석·생성, 머티리얼, 시퀀서, 빌드/쿡/패키징, C++ 리팩터링·에러 진단, 아키텍처 린트 등 UE 개발 전반을 Claude Code·Codex가 다루도록 지원합니다. Fab에서 배포하는 언리얼 엔진 플러그인이라 'claude plugin marketplace add'로는 설치되지 않습니다 — Fab에서 UE 프로젝트에 설치하면 Claude Code용 스킬/에이전트가 함께 설정됩니다.",
+      "description": "언리얼 C++·블루프린트 이해를 위한 ADK (Fab 배포)",
+      "long": "Next Stage Inc.의 NarshaADK — 언리얼 C++ 소스·컴파일 심볼·바이너리 에셋·블루프린트를 AI가 읽어 이해하는 Agent Developer Kit입니다.",
+      "points": [
+        "블루프린트 분석·생성, 머티리얼, 시퀀서",
+        "빌드·쿡·패키징",
+        "C++ 리팩터링·에러 진단, 아키텍처 린트",
+        "Claude Code·Codex 양쪽 지원",
+        "Fab 배포 언리얼 플러그인 — marketplace add로 설치 불가",
+        "Fab에서 UE 프로젝트에 설치 시 스킬·에이전트 동반 구성"
+      ],
       "docs": "Fab · NarshaADK (Next Stage Inc.)",
       "docsUrl": "https://www.fab.com/listings/c919281c-e2e6-4e81-8228-4e178cbc3e8d",
       "manualNote": "이건 Claude 플러그인 저장소가 아니라 Fab에서 배포하는 언리얼 플러그인입니다.\n1) 아래 '📄 Fab' 링크에서 NarshaADK 받기 (또는 fab.com에서 검색)\n2) 언리얼 프로젝트/엔진에 플러그인 설치·활성화\n→ 설치되면 Claude Code용 스킬·에이전트가 자동으로 세팅됩니다.",
@@ -171,7 +289,13 @@
     {
       "id": "game-design", "name": "Game Design", "category": "gamedesign", "popular": true,
       "description": "메카닉·시스템·밸런스·플레이어 심리 설계",
-      "long": "게임 개발 전 분야를 다루는 gamedev-claude-plugins 마켓플레이스의 핵심 플러그인입니다. 게임 메카닉과 시스템 설계, 밸런싱, 플레이어 심리를 바탕으로 탄탄한 게임 디자인을 잡아줍니다. 같은 마켓플레이스에 thinking·narrative·level-design·scope-guardian·product·strategy 등 기획~런칭 전 분야 플러그인이 함께 있어, 필요에 따라 골라 설치할 수 있습니다.",
+      "long": "gamedev-claude-plugins 마켓플레이스의 핵심 플러그인입니다.",
+      "points": [
+        "게임 메카닉·시스템 설계",
+        "밸런싱, 플레이어 심리 기반 설계",
+        "동일 마켓플레이스 구성 — thinking·narrative·level-design·scope-guardian·product·strategy",
+        "기획부터 런칭까지 필요에 따라 선택 설치"
+      ],
       "docs": "github.com/sponticelli/gamedev-claude-plugins",
       "steps": ["/plugin marketplace add sponticelli/gamedev-claude-plugins", "/plugin install game-design@gamedev-claude-plugins"],
       "fallback": []
@@ -179,7 +303,12 @@
     {
       "id": "narrative", "name": "Narrative", "category": "gamedesign", "popular": false,
       "description": "대사·설정(로어)·퀘스트·현지화",
-      "long": "gamedev-claude-plugins 마켓플레이스의 내러티브 플러그인입니다. 캐릭터 대사, 세계관·로어, 퀘스트 구조, 현지화까지 스토리텔링 전반을 설계하도록 도와줍니다. 스토리 중심 게임이나 시나리오·퀘스트 기획에 적합합니다.",
+      "long": "gamedev-claude-plugins 마켓플레이스의 내러티브 플러그인입니다.",
+      "points": [
+        "캐릭터 대사, 세계관·로어 설계",
+        "퀘스트 구조, 현지화",
+        "스토리 중심 게임·시나리오 기획에 적합"
+      ],
       "docs": "github.com/sponticelli/gamedev-claude-plugins",
       "steps": ["/plugin marketplace add sponticelli/gamedev-claude-plugins", "/plugin install narrative@gamedev-claude-plugins"],
       "fallback": []
@@ -187,7 +316,13 @@
     {
       "id": "level-design", "name": "Level Design", "category": "gamedesign", "popular": false,
       "description": "레이아웃·페이싱·인카운터·환경 스토리텔링",
-      "long": "gamedev-claude-plugins 마켓플레이스의 레벨 디자인 플러그인입니다. 맵 레이아웃, 난이도·페이싱, 적 배치(인카운터), 환경을 통한 스토리텔링을 설계하도록 도와줍니다. 스테이지·던전·오픈월드 구역 기획에 씁니다.",
+      "long": "gamedev-claude-plugins 마켓플레이스의 레벨 디자인 플러그인입니다.",
+      "points": [
+        "맵 레이아웃, 난이도·페이싱",
+        "적 배치(인카운터) 설계",
+        "환경을 통한 스토리텔링",
+        "스테이지·던전·오픈월드 구역 기획에 활용"
+      ],
       "docs": "github.com/sponticelli/gamedev-claude-plugins",
       "steps": ["/plugin marketplace add sponticelli/gamedev-claude-plugins", "/plugin install level-design@gamedev-claude-plugins"],
       "fallback": []
@@ -195,7 +330,12 @@
     {
       "id": "scope-guardian", "name": "Scope Guardian", "category": "gamedesign", "popular": false,
       "description": "기획 범위 관리·기능 정렬(스코프 폭주 방지)",
-      "long": "gamedev-claude-plugins 마켓플레이스의 스코프 관리 플러그인입니다. 기획이 무한정 커지는 '스코프 크립'을 막고, 추가하려는 기능이 게임의 핵심 방향과 맞는지 점검해줍니다. 1인·소규모 팀에서 프로젝트를 완주 가능한 크기로 유지할 때 특히 유용합니다.",
+      "long": "gamedev-claude-plugins 마켓플레이스의 스코프 관리 플러그인입니다.",
+      "points": [
+        "'스코프 크립' 차단",
+        "추가 기능과 핵심 방향의 정합성 점검",
+        "1인·소규모 팀의 완주 가능한 규모 유지"
+      ],
       "docs": "github.com/sponticelli/gamedev-claude-plugins",
       "steps": ["/plugin marketplace add sponticelli/gamedev-claude-plugins", "/plugin install scope-guardian@gamedev-claude-plugins"],
       "fallback": []
@@ -203,7 +343,15 @@
     {
       "id": "game-design-skill", "name": "Game Design (방법론)", "category": "gamedesign", "popular": false,
       "description": "게임 디자인 방법론 가이드 — 컨셉·루프·GDD·밸런스 (개발용)",
-      "long": "개발 단계에서 Claude에게 소스 기반 게임 디자인 지식을 심어주는 '설계 가이드' 스킬입니다(게임 안에서 도는 런타임 도구가 아님). 컨셉 발상, 게임 기둥(pillar), 코어 루프, 시스템 분해, GDD 작성, 공식·튜닝 노브, 밸런스·경제 분석, 프로토타이핑, 플레이테스트 해석, UX·접근성·스코프 관리, 설계 변경 전파, 문서 리뷰까지 게임 디자인 전반을 다룹니다.",
+      "long": "개발 단계에서 소스 기반 게임 디자인 지식을 제공하는 설계 가이드 스킬입니다.",
+      "points": [
+        "컨셉 발상, 게임 기둥(pillar), 코어 루프",
+        "시스템 분해, GDD 작성",
+        "공식·튜닝 노브, 밸런스·경제 분석",
+        "프로토타이핑, 플레이테스트 해석",
+        "UX·접근성·스코프 관리, 설계 변경 전파, 문서 리뷰",
+        "적용 범위 — 개발용 가이드, 게임 내 런타임 도구 아님"
+      ],
       "docs": "github.com/JupiterTheWarlock/game-design-skill",
       "steps": ["/plugin marketplace add JupiterTheWarlock/game-design-skill", "/plugin install game-design-skill@game-design-skill"],
       "fallback": []
@@ -211,7 +359,15 @@
     {
       "id": "ai-native-game-design", "name": "AI-Native Game Design", "category": "gamedesign", "popular": false,
       "description": "런타임 AI를 쓰는 'AI-네이티브 게임' 설계·리뷰 스킬 (개발용)",
-      "long": "출시된 게임 안에서 런타임 AI가 플레이어의 표현을 해석하거나, 콘텐츠·규칙을 생성하고, 결과를 판정하거나, 지능적 캐릭터·관계를 유지하는 'AI-네이티브 게임'을 어떻게 설계·리뷰할지 돕는 개발용 가이드 스킬입니다. 플레이어-AI 인터페이스, 경계 있는 생성(bounded generation), 게임 상태 권한, 캐릭터 기억·연속성, 실패 복구, AI 동료, 멀티에이전트 사회, 오픈 내러티브, 안전·프라이버시 요건 등을 다룹니다. 게임에 AI를 넣어주는 런타임 도구가 아니라, 그런 게임의 '설계'를 돕는 스킬입니다.",
+      "long": "출시된 게임 안에서 런타임 AI가 동작하는 'AI-네이티브 게임'의 설계·리뷰를 돕는 개발용 가이드 스킬입니다.",
+      "points": [
+        "플레이어-AI 인터페이스 설계",
+        "경계 있는 생성(bounded generation), 게임 상태 권한",
+        "캐릭터 기억·연속성, 실패 복구",
+        "AI 동료, 멀티에이전트 사회, 오픈 내러티브",
+        "안전·프라이버시 요건",
+        "적용 범위 — 설계를 돕는 스킬, 게임에 AI를 넣는 런타임 도구 아님"
+      ],
       "docs": "github.com/JupiterTheWarlock/game-design-skill",
       "steps": ["/plugin marketplace add JupiterTheWarlock/game-design-skill", "/plugin install ai-native-game-design@game-design-skill"],
       "fallback": []

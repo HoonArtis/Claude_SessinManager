@@ -143,6 +143,10 @@
   @keyframes mcpReveal { from { opacity: 0; transform: translateY(-7px); } to { opacity: 1; transform: translateY(0); } }
   @media (prefers-reduced-motion: reduce) { .mcp-detailx { animation: none; } }
   .mcp-detailx p { margin: 0; font-size: 13px; color: var(--text); line-height: 1.6; }
+  .mcp-lead { font-weight: 600; }
+  /* 리스트형 문어체 — 선두 문장 뒤에 명사형 항목을 나열 (새 세션 안내문과 같은 형식) */
+  .mcp-points { margin: -4px 0 0; padding-left: 17px; display: flex; flex-direction: column; gap: 3px; }
+  .mcp-points li { font-size: 12.5px; color: var(--muted); line-height: 1.55; }
   .mcp-kv { display: grid; grid-template-columns: 64px 1fr; gap: 4px 10px; font-size: 12.5px; }
   .mcp-kv .mcp-k { color: var(--muted); }
   .mcp-kv code, .mcp-cmd code { font-family: Consolas, 'Courier New', monospace; font-size: 12px; }
@@ -1857,11 +1861,13 @@ load();
       const fblbl = `<div class="mcp-fblbl">${(m.steps || []).some((s) => s.indexOf('/plugin') === 0) ? '설치 순서 (플러그인 → 실패 시 폴백):' : '설치:'}</div>`;
       body = `${fblbl}<div class="mcp-cmd">${harCmd(m)}</div>`;
     }
+    const points = (m.points && m.points.length)
+      ? `<ul class="mcp-points">${m.points.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>` : '';
     return `<div class="mcp-dhead">
         <div class="mcp-dtitle"><span class="mcp-logo ${isMcp ? '' : 'mcp-pl'}">${esc((m.name || '?').slice(0, 2).toUpperCase())}</span><span>${esc(m.name)}</span></div>
         <button class="mcp-dclose" id="mcpDetailClose" aria-label="상세 닫기">✕</button>
       </div>
-      <div class="mcp-dbody"><div class="mcp-detailx"><p>${esc(m.long || m.description)}</p>${body}${docLink(m)}</div></div>`;
+      <div class="mcp-dbody"><div class="mcp-detailx"><p class="mcp-lead">${esc(m.long || m.description)}</p>${points}${body}${docLink(m)}</div></div>`;
   }
   // 패널을 다시 그린 뒤 카드의 '보는 중' 표시를 맞춘다. openId가 현재 목록에 없으면(검색·필터로 사라짐) 그대로 둔다.
   function renderDetail() {
