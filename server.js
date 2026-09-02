@@ -9,10 +9,11 @@ const { spawn, spawnSync } = require('node:child_process');
 const { scanSessions } = require('./lib/scan-sessions');
 const { getKeybindings, setKeybinding, unsetKeybinding } = require('./lib/wt-keybindings');
 const { trashSessions } = require('./lib/trash-sessions');
-const { buildLaunchArgs, readDefaultFolder, withDefaultFolder } = require('./lib/new-session');
+const { readDefaultFolder, withDefaultFolder } = require('./lib/new-session');
+const { buildLaunchArgs, buildMultiPaneArgs, claudeSpawn, claudeCommandLine } = require('./lib/launch');
 const { parseSession, extractUserPrompts, extractConversation, extractConversationFull } = require('./lib/parse-session');
 const { buildHandoffMd } = require('./lib/handoff');
-const { loadCatalog, buildMcpAddArgs, buildHarnessPrompt, parseInstalledMcps, parseInstalledPlugins } = require('./lib/mcp-catalog');
+const { loadCatalog, buildMcpAddArgs, buildHarnessPrompt, buildInstallFixPrompt, parseInstalledMcps, parseInstalledPlugins } = require('./lib/mcp-catalog');
 const { uefnLogPath, parseVerseProjectRoot } = require('./lib/uefn-detect');
 
 const SAFE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
@@ -185,7 +186,7 @@ function wtSettingsPath() {
   return WT_SETTINGS_CANDIDATES.find((p) => fs.existsSync(p)) || null;
 }
 
-// 열기 방식(window/tab/split-right/split-down)과 런치 인자는 lib/new-session이 단일 출처.
+// 프로세스 실행 경로는 lib/launch가 단일 출처 — 여기 한 곳을 고치면 모든 실행이 함께 바뀐다.
 // command가 falsy면 그 폴더에서 셸만 연다(claude 없이).
 function launchInTerminal(cwd, command, mode) {
   const { cmd, args } = buildLaunchArgs({ cwd, command, mode, hasWt });
@@ -207,15 +208,36 @@ function openFolder(cwd) {
   child.unref();
 }
 
+// 여러 줄 프롬프트는 명령줄 인자로 넘길 수 없다 — Windows에서 줄바꿈이 명령을 끊어
+// 첫 줄만 전달되고 "무엇을 설치할지"가 통째로 사라진다.
+// 그래서 프롬프트를 파일로 쓰고, 그 파일을 읽으라는 한 줄짜리 지시만 넘긴다.
+function launchClaudeWithPrompt(cwd, prompt, mode, tag) {
+  const dir = path.join(os.tmpdir(), 'csm-install');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `${tag}-${Date.now()}.md`);
+  fs.writeFileSync(file, prompt, 'utf8');
+  const line = `claude "${file} 파일을 읽고 그 안의 지시대로 실행해줘"`;
+  if (/[\r\n]/.test(line)) throw new Error('실행 명령에 줄바꿈이 남아 있습니다');
+  launchInTerminal(cwd, line, mode);
+  return file;
+}
+
+// claude CLI 실행. Windows에서 npm -g로 설치하면 claude.cmd만 있는데
+// spawn은 .cmd를 직접 못 열어 ENOENT가 난다 — resolveCommand가 실제 파일을 찾아 감싼다.
+function runClaude(argv, opts = {}) {
+  const { cmd, args } = claudeSpawn(argv, CLEAN_ENV);
+  return spawnSync(cmd, args, { encoding: 'utf8', env: CLEAN_ENV, windowsHide: true, ...opts });
+}
+
 // 설치된 MCP/플러그인 이름을 CLI로 조회(실패해도 빈 배열).
 function detectInstalled() {
   const result = { mcp: [], harness: [] };
   try {
-    const r = spawnSync('claude', ['mcp', 'list'], { encoding: 'utf8', timeout: 20000, env: CLEAN_ENV });
+    const r = runClaude(['mcp', 'list'], { timeout: 20000 });
     if (r.stdout) result.mcp = [...parseInstalledMcps(r.stdout)];
   } catch {}
   try {
-    const r = spawnSync('claude', ['plugin', 'list'], { encoding: 'utf8', timeout: 20000, env: CLEAN_ENV });
+    const r = runClaude(['plugin', 'list'], { timeout: 20000 });
     if (r.stdout) result.harness = [...parseInstalledPlugins(r.stdout)];
   } catch {}
   return result;
@@ -498,7 +520,8 @@ const server = http.createServer(async (req, res) => {
       }
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' });
       // stream-json: assistant 메시지가 나오는 대로 스트리밍, 마지막 result에서 분기 ID를 체인에 기록
-      const child = spawn('cmd', ['/c', 'claude', '-p', '--resume', effectiveId, '--output-format', 'stream-json', '--verbose'], {
+      const streamCmd = claudeSpawn(['-p', '--resume', effectiveId, '--output-format', 'stream-json', '--verbose'], CLEAN_ENV);
+      const child = spawn(streamCmd.cmd, streamCmd.args, {
         cwd: meta.cwd, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], env: CLEAN_ENV,
       });
       const killer = setTimeout(() => { try { child.kill(); } catch {} }, 10 * 60 * 1000);
@@ -785,15 +808,9 @@ const server = http.createServer(async (req, res) => {
       }
       // wt 한 번 호출로 새 탭 + 분할들을 이어붙인다.
       // 2개: 좌|우, 3개: 좌(전체높이)|우상/우하, 4개: 2x2(田) — 4번째는 왼쪽으로 포커스를 옮겨 쪼갠다
-      const args = [];
-      items.forEach((it, i) => {
-        if (i > 0) args.push(';');
-        if (i === 0) args.push('-w', 'new', 'nt');
-        else if (i === 1) args.push('sp', '-V');
-        else if (i === 2) args.push('sp', '-H');
-        else args.push('mf', 'left', ';', 'sp', '-H');
-        args.push('-d', it.cwd, 'cmd', '/k', `claude --resume ${it.sessionId}`);
-      });
+      const args = buildMultiPaneArgs(items.map((it) => ({
+        cwd: it.cwd, command: claudeCommandLine(`--resume ${it.sessionId}`),
+      })));
       const child = spawn('wt', args, { detached: true, stdio: 'ignore', env: CLEAN_ENV });
       child.unref();
       sendJson(res, 200, { ok: true });
@@ -993,7 +1010,7 @@ const server = http.createServer(async (req, res) => {
       if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
       let body;
       try { body = JSON.parse(await readBody(req)); } catch { sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' }); return; }
-      const { items, scope, projectDir } = body || {};
+      const { items, scope, projectDir, mode } = body || {};
       if (!Array.isArray(items) || !items.length) { sendJson(res, 400, { error: '설치할 항목이 없습니다.' }); return; }
       const useScope = scope === 'project' ? 'project' : 'user';
       const cwd = useScope === 'project' ? projectDir : undefined;
@@ -1001,16 +1018,38 @@ const server = http.createServer(async (req, res) => {
       const cat = loadCatalog(__dirname);
       const byId = new Map(cat.mcp.map((m) => [m.id, m]));
       const results = [];
+      const postInstall = []; // 설치만으로 끝나지 않는 항목(예: p4 login 티켓)은 터미널을 띄워 바로 이어서 하게 한다
       for (const it of items) {
         const entry = byId.get(it && it.id);
         if (!entry) { results.push({ id: it && it.id, ok: false, message: '카탈로그에 없는 항목' }); continue; }
         const argv = buildMcpAddArgs(entry, { scope: useScope, envValues: it.envValues || {}, headerValues: it.headerValues || {} });
-        const r = spawnSync('claude', argv, { encoding: 'utf8', timeout: 120000, cwd, env: CLEAN_ENV });
+        const r = runClaude(argv, { timeout: 120000, cwd });
         const ok = r.status === 0;
         const msg = ok ? '설치됨' : String((r.stderr || r.stdout || (r.error && r.error.message) || '실패')).trim().slice(0, 400);
-        results.push({ id: entry.id, ok, message: msg });
+        results.push({ id: entry.id, ok, message: msg, command: ok ? undefined : 'claude ' + argv.join(' ') });
+        const post = ok && entry.postInstall && entry.postInstall.cmd;
+        if (post) {
+          launchInTerminal(cwd || os.homedir(), entry.postInstall.cmd, mode);
+          postInstall.push({ id: entry.id, cmd: entry.postInstall.cmd, label: entry.postInstall.label || '' });
+        }
       }
-      sendJson(res, 200, { results });
+      sendJson(res, 200, { results, postInstall });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/api/mcp-fix') {
+      // 설치 실패한 항목을 그 자리에서 claude에게 넘긴다 — 명령과 에러를 그대로 붙여 보낸다.
+      if (!isLoopback(req)) { sendJson(res, 403, { error: '이 기능은 자기 컴퓨터에서만 쓸 수 있습니다.' }); return; }
+      let body;
+      try { body = JSON.parse(await readBody(req)); } catch { sendJson(res, 400, { error: '잘못된 JSON 본문입니다.' }); return; }
+      const { failures, mode, projectDir } = body || {};
+      if (!Array.isArray(failures) || !failures.length) { sendJson(res, 400, { error: '전달할 실패 항목이 없습니다.' }); return; }
+      const byId = new Map(loadCatalog(__dirname).mcp.map((m) => [m.id, m]));
+      const known = failures.filter((f) => f && byId.has(f.id))
+        .map((f) => ({ id: f.id, name: byId.get(f.id).name, command: f.command, message: f.message }));
+      if (!known.length) { sendJson(res, 400, { error: '카탈로그에 없는 항목입니다.' }); return; }
+      const cwd = projectDir && fs.existsSync(projectDir) ? projectDir : os.homedir();
+      const file = launchClaudeWithPrompt(cwd, buildInstallFixPrompt(known), mode, 'mcp-fix');
+      sendJson(res, 200, { ok: true, handed: known.map((f) => f.id), promptFile: file });
       return;
     }
     if (req.method === 'POST' && req.url === '/api/harness-install') {
@@ -1023,9 +1062,8 @@ const server = http.createServer(async (req, res) => {
       const byId = new Map(cat.harness.map((h) => [h.id, h]));
       const entries = ids.map((id) => byId.get(id)).filter(Boolean);
       if (!entries.length) { sendJson(res, 400, { error: '카탈로그에 없는 하네스입니다.' }); return; }
-      const prompt = buildHarnessPrompt(entries).replace(/"/g, '\\"');
-      launchInTerminal(os.homedir(), `claude "${prompt}"`, mode);
-      sendJson(res, 200, { ok: true, launched: entries.map((e) => e.id) });
+      const file = launchClaudeWithPrompt(os.homedir(), buildHarnessPrompt(entries), mode, 'harness');
+      sendJson(res, 200, { ok: true, launched: entries.map((e) => e.id), promptFile: file });
       return;
     }
     sendJson(res, 404, { error: 'not found' });

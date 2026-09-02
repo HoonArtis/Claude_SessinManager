@@ -2089,7 +2089,21 @@ load();
         const items = [...S].map((id) => ({ id, envValues: collectEnv(id) }));
         const res = await fetch('/api/mcp-install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items, scope, projectDir }) });
         const j = await res.json();
-        alert((j.results || []).map((x) => `${x.id}: ${x.ok ? '✅ 설치됨' : '❌ ' + x.message}`).join('\n') || (j.error || '실패'));
+        const lines = (j.results || []).map((x) => `${x.id}: ${x.ok ? '✅ 설치됨' : '❌ ' + x.message}`);
+        for (const p of j.postInstall || []) lines.push(`\n▶ ${p.id}: ${p.label || '후속 설정'} — 터미널에서 ${p.cmd} 실행 중`);
+        const failed = (j.results || []).filter((x) => !x.ok);
+        if (failed.length) {
+          // 실패를 알리고 끝내지 않는다 — 명령과 에러를 그대로 claude에 넘겨 그 자리에서 해결하게 한다
+          lines.push(`\n${failed.length}개가 실패했습니다. Claude를 열어서 에러까지 넘기고 이어서 설치할까요?`);
+          if (confirm(lines.join('\n'))) {
+            const fr = await fetch('/api/mcp-fix', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ failures: failed.map((x) => ({ id: x.id, command: x.command, message: x.message })), projectDir }) });
+            const fj = await fr.json();
+            if (!fj.ok) alert('Claude 실행 실패: ' + (fj.error || ''));
+          }
+        } else {
+          alert(lines.join('\n') || (j.error || '실패'));
+        }
       } else {
         const res = await fetch('/api/harness-install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [...S] }) });
         const j = await res.json();
